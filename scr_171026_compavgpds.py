@@ -62,7 +62,7 @@ def setfilepaths():
         ncSubDir = ''
         saveDir = 'C:\\Users\\woelfle\\Documents\\UW\\CESM\\figs\\'
 
-    elif gethostname()[0:6] in ['yslogi', 'geyser']:
+    elif gethostname()[0:6] in ['yslogi', 'geyser', 'cheyen']:
         ncDir = '/glade/p/cgd/amp/people/hannay/amwg/climo/'
         ncSubDir = '0.9x1.25/'
         saveDir = '/glade/p/work/woelfle/figs/cesm1to2/'
@@ -90,8 +90,8 @@ if __name__ == '__main__':
     newVars = 'PRECT'
 
     # Set flags for loading/plotting/doing things
-    loadGpcp_flag = True
-    loadHadIsst_flag = True
+    loadGpcp_flag = False
+    loadHadIsst_flag = False
     ocnOnly_flag = False
     prect_flag = True
     save_flag = True
@@ -101,9 +101,9 @@ if __name__ == '__main__':
     ncDir, ncSubDir, saveDir = setfilepaths()
 
     # Set name(s) of file(s) to load
-    versionId = '194'
-    caseBase = 'b.e20.B1850.f09_g17.pi_control.all.194'
-    yrIds = ['14-33', '15-29', '50-69', '100-119']
+    versionId = '195'
+    caseBase = c1to2p.getcasebase(versionId)
+    yrIds = c1to2p.getavailableyearslist(versionId)
     subDirs = ['yrs_' + yr for yr in yrIds]
     fileName = caseBase + '_ANN_climo.nc'
 
@@ -154,13 +154,16 @@ if __name__ == '__main__':
     if True:  # plotRegMean_flag:
 
         # Set variable for plotting
-        plotVar = 'TS'
+        plotVar = 'PRECT'
 
         # Set flags and other options based on variable to be plotted
         if plotVar == 'TS':
             latLim = np.array([-3, 3])
             lonLim = np.array([180, 220])
-            obsDs = hadIsstDs
+            try:
+                obsDs = hadIsstDs
+            except NameError:
+                obsDs = None
             obsVar = 'sst'
             ocnOnly_flag = True
             rmRefRegMean_flag = True
@@ -170,9 +173,12 @@ if __name__ == '__main__':
         elif plotVar in ['PRECT', 'PRECC', 'PRECL']:
             latLim = np.array([-20, 0])
             lonLim = np.array([210, 260])
-            obsDs = gpcpDs
+            try:
+                obsDs = gpcpDs
+            except NameError:
+                obsDs = None
             obsVar = 'precip'
-            ocnOnly_flag = False
+            ocnOnly_flag = ocnOnly_flag 
             rmRefRegMean_flag = False
             yLim = np.array([1.00, 2.75])
         else:
@@ -185,6 +191,10 @@ if __name__ == '__main__':
         # Create dictionary to hold annual mean value (and colors)
         annMean = dict()
         colorDict = dict()
+
+        # Determine if obs are available to plot
+        if obsDs is None:
+            plotObs_flag = False
 
         # Compute regional mean over double-ITCZ region as defined in
         #   Bellucci et al. (2010, J Clim)
@@ -225,43 +235,48 @@ if __name__ == '__main__':
             annMean[yid] = regMeanDs.mean(dim='time')
 
         # Copmute regional mean of observations
-        obsRegMeanDs = mwfn.calcdsregmean(obsDs[obsVar],
-                                          gwDa=None,
-                                          latLim=latLim,
-                                          lonLim=lonLim,
-                                          stdUnits_flag=True,
-                                          )
-        # Compute regional mean of reference region for observations
-        if rmRefRegMean_flag:
-            obsRefRegMeanDs = mwfn.calcdsregmean(obsDs[obsVar],
-                                                 gwDa=None,
-                                                 latLim=refLatLim,
-                                                 lonLim=refLonLim,
-                                                 stdUnits_flag=True,
-                                                 )
+        if plotObs_flag:
+            obsRegMeanDs = mwfn.calcdsregmean(obsDs[obsVar],
+                                              gwDa=None,
+                                              latLim=latLim,
+                                              lonLim=lonLim,
+                                              stdUnits_flag=True,
+                                              )
+            # Compute regional mean of reference region for observations
+            if rmRefRegMean_flag:
+                obsRefRegMeanDs = mwfn.calcdsregmean(obsDs[obsVar],
+                                                     gwDa=None,
+                                                     latLim=refLatLim,
+                                                     lonLim=refLonLim,
+                                                     stdUnits_flag=True,
+                                                     )
 
-            obsRegMeanDs = obsRegMeanDs - obsRefRegMeanDs
+                obsRegMeanDs = obsRegMeanDs - obsRefRegMeanDs
 
-        annMean['obs'] = obsRegMeanDs.mean(dim='time')
+            annMean['obs'] = obsRegMeanDs.mean(dim='time')
 
         # Plot annual mean values
         plt.figure()
-
-        plt.scatter(np.arange(1, len(annMean)),
+        plt.scatter(np.arange(1, len(annMean) + 1),
                     np.array([annMean[yid] for yid in yrIds]),
                     marker='o',
                     c=[getcolordict()[versionId] for yid in yrIds],
                     s=80,
                     )
-        plt.scatter([len(annMean)],
-                    annMean['obs'],
-                    marker='^',
-                    c=getcolordict()['obs'],
-                    s=80,
-                    )
+        if plotObs_flag:
+            plt.scatter([len(annMean)],
+                        annMean['obs'],
+                        marker='^',
+                        c=getcolordict()['obs'],
+                        s=80,
+                        )
 
-        plt.xticks(np.arange(1, len(annMean) + 1),
-                   yrIds + ['obs'])
+        if plotObs_flag:
+            plt.xticks(np.arange(1, len(annMean) + 2),
+                       yrIds + ['obs'])
+        else:
+            plt.xticks(np.arange(1, len(annMean) + 1),
+                       yrIds)
         plt.xlabel('Averaging Period')
 
         plt.ylabel(plotVar + ' (' +
@@ -280,9 +295,11 @@ if __name__ == '__main__':
             plt.title('Annual mean CT index ({:s}) for v{:s}'.format(
                 plotVar, versionId))
 
+       # plt.show()
+
         if save_flag:
             if plotVar in ['PRECT', 'PRECC', 'PRECL']:
-                mwp.savefig(saveDir + 'testfigs/' +
+                mwp.savefig(saveDir + 
                             'annmean_dITCZindex_v{:s}'.format(versionId))
             elif plotVar in ['TS']:
                 mwp.savefig(saveDir + 'testfigs/' +

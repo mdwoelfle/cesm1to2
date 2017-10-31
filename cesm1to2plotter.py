@@ -43,6 +43,39 @@ import multiprocessing as mp  # Allow use of multiple cores
 # %% Define functions
 
 
+def getavailableyearslist(versionId):
+    """
+    Get list of averaging periods available for a given model version
+    """
+    return {'01': None,
+            '28': ['2-10', '2-20', '50-74', '75-99'],
+            '36': ['2-10', '2-20', '21-40', '60-60', '75-99'],
+            'ga7.66': ['2-20', '20-39', '55-74'],
+            '119': ['2-9', '2-21', '21-40', '30-49', '75-99'],
+            '125': ['2-9', '2-21', '11-30', '21-40', '30-49', '70-89', '80-99',
+                    '100-109', '100-119'],
+            '161': ['1850-1869', '1920-1939', '1980-1999'],
+            '194': ['14-33', '15-29', '50-69', '100-119'],
+            '195': ['15-29', '50-69', '80-99', '100-119', '122-141'],
+            }[versionId]
+
+
+def getcasebase(versionId):
+    """
+    Get long form nave for a given version ID for cesm1to2 cases
+    """
+    return {'01': 'b.e15.B1850G.f09_g16.pi_control.01',
+            '28': 'b.e15.B1850G.f09_g16.pi_control.28',
+            '36': 'b.e15.B1850.f09_g16.pi_control.36',
+            'ga7.66': 'b.e15.B1850.f09_g16.pi_control.all_ga7.66',
+            '119': 'b.e15.B1850.f09_g16.pi_control.all.119',
+            '125': 'b.e20.B1850.f09_g16.pi_control.all.125',
+            '161': 'b.e20.BHIST.f09_g17.20thC.161_01',
+            '194': 'b.e20.B1850.f09_g17.pi_control.all.194',
+            '195': 'b.e20.B1850.f09_g17.pi_control.all.195',
+            }[versionId]
+
+
 def getcontlevels(plotVar,
                   diff_flag=False):
     """

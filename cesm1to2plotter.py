@@ -76,8 +76,60 @@ def getcasebase(versionId):
             }[versionId]
 
 
-def getcontlevels(plotVar,
-                  diff_flag=False):
+def getcompcont(plotVar,
+                diff_flag=False):
+    """
+    Determine comparison contour value for given plotVar
+
+    Author:
+        Matthew Woelfle
+
+    Version Date:
+        2017-10-17
+
+    Args:
+        plotVar - name of variable (in CESM parlance) for which comparison
+            contour is to be retrieved
+
+    Kwargs:
+        diff_flag - true if plotting difference in variable
+    """
+    if not diff_flag:
+        try:
+            compcont = {'FLNS': np.array([0.]),
+                        'FNS': np.array([0.]),
+                        'FSNS': np.array([0.]),
+                        'LHFLX': np.array([0.]),
+                        'OMEGA500': np.array([0.]),
+                        'OMEGA850': np.array([0.]),
+                        'PRECC': np.array([2.]),
+                        'PRECL': np.array([2.]),
+                        'PRECT': np.array([2.]),
+                        'PS': np.array([1008.]),
+                        'SHFLX': np.array([0]),
+                        'TAUX': np.array([0]),
+                        'TAUY': np.array([0]),
+                        'TS': np.array([300]),
+                        'curlTau': np.array([0]),
+                        'curlTau_y': np.array([0]),
+                        'divTau': np.array([0]),
+                        'ekmanx': np.array([0]),
+                        'ekmany': np.array([0]),
+                        'precip': np.array([2.]),
+                        'sst': np.array([300]),
+                        'sverdrupx': np.array([0]),
+                        'MGx': np.array([0])
+                        }[plotVar]
+        except KeyError:
+            compcont = None
+    else:
+        compcont = np.array([0])
+
+    return compcont
+
+
+def getmapcontlevels(plotVar,
+                     diff_flag=False):
     """
     Determine contour values for given plotVar
 
@@ -155,56 +207,83 @@ def getcontlevels(plotVar,
     return levels
 
 
-def getcompcont(plotVar,
-                diff_flag=False):
+def getzonmeancontlevels(plotVar,
+                         diff_flag=False):
     """
-    Determine comparison contour value for given plotVar
+    Determine contour values for given plotVar
 
     Author:
         Matthew Woelfle
 
     Version Date:
-        2017-10-17
+        2017-10-31
 
     Args:
-        plotVar - name of variable (in CESM parlance) for which comparison
-            contour is to be retrieved
+        plotVar - name of variable (in CESM parlance) for which contours are to
+            be retrieved
 
     Kwargs:
         diff_flag - true if plotting difference in variable
     """
     if not diff_flag:
         try:
-            compcont = {'FLNS': np.array([0.]),
-                        'FNS': np.array([0.]),
-                        'FSNS': np.array([0.]),
-                        'LHFLX': np.array([0.]),
-                        'OMEGA500': np.array([0.]),
-                        'OMEGA850': np.array([0.]),
-                        'PRECC': np.array([2.]),
-                        'PRECL': np.array([2.]),
-                        'PRECT': np.array([2.]),
-                        'PS': np.array([1008.]),
-                        'SHFLX': np.array([0]),
-                        'TAUX': np.array([0]),
-                        'TAUY': np.array([0]),
-                        'TS': np.array([300]),
-                        'curlTau': np.array([0]),
-                        'curlTau_y': np.array([0]),
-                        'divTau': np.array([0]),
-                        'ekmanx': np.array([0]),
-                        'ekmany': np.array([0]),
-                        'precip': np.array([2.]),
-                        'sst': np.array([300]),
-                        'sverdrupx': np.array([0]),
-                        'MGx': np.array([0])
-                        }[plotVar]
+            levels = {'FLNS': np.arange(0., 120.1, 10),
+                      'FNS': np.arange(-600., 600.1, 100),
+                      'FSNS': np.arange(0, 400.1, 20.),
+                      'LHFLX': np.arange(0, 200.1, 10),
+                      'OMEGA500': np.arange(-0.125, 0.1251, 0.0125),
+                      'OMEGA850': np.arange(-0.125, 0.1251, 0.0125),
+                      'PRECC': np.arange(0, 20.1, 2),
+                      'PRECL': np.arange(0, 20.1, 2),
+                      'PRECT': np.arange(0, 20.1, 2),
+                      'PS': np.arange(1004., 1013.1, 1),
+                      'SHFLX': np.arange(0, 20., 1.),
+                      'TAUX': np.arange(-0.2, 0.201, 0.02),
+                      'TAUY': np.arange(-0.1, 0.101, 0.01),
+                      'TS': np.arange(290, 305, 1),
+                      'curlTau': np.arange(-3e-7, 3.001e-7, 3e-8),
+                      'curlTau_y': np.arange(-4e-13, 4.01e-13, 4e-14),
+                      'divTau': np.arange(-2e-7, 2.01e-7, 2e-8),
+                      'ekmanx': np.arange(-1.5e5, 1.501e5, 1.5e4),
+                      'ekmany': np.arange(-3e4, 3.01e4, 3e3),
+                      'precip': np.arange(0, 20.1, 2),
+                      'sst': np.arange(290, 305, 1),
+                      'sverdrupx': np.arange(-1.5e5, 1.501e5, 1.5e4),
+                      'MGx': np.arange(-1.5e5, 1.501e5, 1.5e4)
+                      }[plotVar]
         except KeyError:
-            compcont = None
+            levels = None
     else:
-        compcont = np.array([0])
+        try:
+            levels = {'FLNS': np.arange(-30., 30.1, 3),
+                      # 'FNS': np.arange(-600., 600.1, 100),
+                      'FNS': np.arange(-200, 200.1, 20),
+                      'FSNS': np.arange(-50, 50.1, 5.),
+                      'LHFLX': np.arange(-50, 50.1, 5),
+                      'OMEGA500': np.arange(-0.125, 0.1251, 0.0125),
+                      'OMEGA850': np.arange(-0.125, 0.1251, 0.0125),
+                      'PRECC': np.arange(-10, 10.1, 1),
+                      'PRECL': np.arange(-10, 10.1, 1),
+                      'PRECT': np.arange(-10, 10.1, 1),
+                      'PS': np.arange(-4., 4.01, 0.5),
+                      'SHFLX': np.arange(-10, 10., 1.),
+                      'TAUX': np.arange(-0.1, 0.101, 0.01),
+                      'TAUY': np.arange(-0.1, 0.101, 0.01),
+                      'TS': np.arange(-2, 2.1, 0.2),
+                      'curlTau': np.arange(-1.5e-7, 1.51e-7, 1.5e-8),
+                      'curlTau_y': np.arange(-4e-13, 4.01e-13, 4e-14),
+                      'divTau': np.arange(-1e-7, 1.01e-7, 1e-8),
+                      'ekmanx': np.arange(-1.5e5, 1.501e5, 1.5e4),
+                      'ekmany': np.arange(-1e4, 1.01e4, 1e3),
+                      'precip': np.arange(-10, 10.1, 1),
+                      'sst': np.arange(-2, 2.1, 0.2),
+                      'sverdrupx': np.arange(-1.5e5, 1.501e5, 1.5e4),
+                      'MGx': np.arange(-1.5e5, 1.501e5, 1.5e4)
+                      }[plotVar]
+        except KeyError:
+            levels = None
 
-    return compcont
+    return levels
 
 
 def plotlatlon(ds,
@@ -260,10 +339,10 @@ def plotlatlon(ds,
 
     # Get levels for contouring if not provided
     if levels is None:
-        levels = getcontlevels(plotVar,
-                               diff_flag=any([diff_flag,
-                                              rmRegMean_flag])
-                               )
+        levels = getmapcontlevels(plotVar,
+                                  diff_flag=any([diff_flag,
+                                                 rmRegMean_flag])
+                                   )
     if compcont is None:
         compcont = getcompcont(plotVar,
                                diff_flag=any([diff_flag,
@@ -485,7 +564,7 @@ def plotmultilatlon(dsDict,
     if lonlbls is None:
         lonlbls = mwp.getlonlbls(lonLim)
 
-    # Ensure diffIdList provided if diff_flag
+    # Ensure diffIdList or diffDs provided if diff_flag
     if all([diff_flag, (diffIdList is None), (diffDs is None)]):
         raise ValueError('diffIdList or diffDs must be provided to plot ' +
                          'differences')
@@ -745,6 +824,227 @@ def plotmultilatlon(dsDict,
                 '{:03.0f}'.format(tSteps[0]) + '-' +
                 '{:03.0f}'.format(tSteps[-1]) +
                 ('_nocb' if not cbar_flag else '')
+                )
+
+        # Set saved figure size (inches)
+        fx = hf.get_size_inches()[0]
+        fy = hf.get_size_inches()[1]
+
+        # Save figure
+        print(saveDir + saveFile)
+        mwp.savefig(saveDir + saveFile,
+                    shape=np.array([fx, fy]))
+        plt.close('all')
+
+
+def plotmultizonregmean(dsDict,
+                        plotIdList,
+                        plotVar,
+                        cbar_flag=True,
+                        compcont_flag=False,
+                        compcont=None,
+                        diff_flag=False,
+                        diffIdList=None,
+                        diffDs=None,
+                        diffVar=None,
+                        fontSize=12,
+                        gsEdges=None,  # list [L, R, B, T]
+                        latLim=np.array([-30, 30]),
+                        latlbls=None,
+                        levels=None,
+                        lonLim=np.array([120, 270]),
+                        lonlbls=None,
+                        ocnOnly_flag=False,
+                        save_flag=False,
+                        saveDir=None,
+                        stampDate_flag=False,
+                        stdUnits_flag=True,
+                        subFigCountStart='a',
+                        **kwargs
+                        ):
+    """
+    Plot hovmollers of zonal means from multiple cases for comparison
+
+    Version Date:
+        2017-10-31
+    """
+
+    # Set lat/lon labels
+    if latlbls is None:
+        latlbls = mwp.getlatlbls(latLim)
+
+    # Ensure diffIdList or diffDs provided if diff_flag
+    if all([diff_flag, (diffIdList is None), (diffDs is None)]):
+        raise ValueError('diffIdList or diffDs must be provided to plot' +
+                         'differences')
+
+    # Set variable for differencing; assumes plotVar if not provided
+    if diffVar is None:
+        diffVar = plotVar
+
+    # Determine contour values if not provided
+    if levels is None:
+        levels = getzonmeancontlevels(plotVar,
+                                      diff_flag=diff_flag)
+
+    # Create figure for plotting
+    hf = plt.figure()
+    if len(plotIdList) == 9:
+        # Set figure window size
+        hf.set_size_inches(16.25, 7.75, forward=True)
+
+        if gsEdges is None:
+            # Edges of gridspec's outermost axes [L, R, B, T]
+            gsEdges = [0.04, 0.97, 0.07, 0.97]
+
+        # Set up subplots
+        gs = gridspec.GridSpec(3, 4,
+                               left=gsEdges[0],
+                               right=gsEdges[1],
+                               bottom=gsEdges[2],
+                               top=gsEdges[3],
+                               height_ratios=[1, 1, 1],
+                               hspace=0.25,
+                               width_ratios=[30, 30, 30, 1],
+                               wspace=0.15)
+
+        # Set gridspec colorbar location
+        cbColInd = 3
+        cbRowInd = 0
+
+        # Set gridspec index order
+        colInds = [0, 1, 2]*3
+        rowInds = np.repeat(range(3), 3)
+
+    # Plot hovmollers
+    for jSet, plotId in enumerate(plotIdList):
+        plt.subplot(gs[rowInds[jSet], colInds[jSet]])
+        # Compute zonal mean
+        zonMeanDa = mwfn.calcdaregzonmean(dsDict[plotId][plotVar],
+                                          gwDa=(dsDict[plotId]['gw']
+                                                if 'gw' in dsDict[plotId]
+                                                else None),
+                                          latLim=latLim,
+                                          lonLim=lonLim,
+                                          ocnOnly_flag=ocnOnly_flag,
+                                          qc_flag=False,
+                                          landFracDa=(
+                                              dsDict[plotId]['LANDFRAC']
+                                              if 'LANDFRAC' in dsDict[plotId]
+                                              else None),
+                                          stdUnits_flag=stdUnits_flag,
+                                          )
+
+        _, c1 = mwp.plotzonmean(np.concatenate((zonMeanDa.values,
+                                                zonMeanDa.values[:1, :]),
+                                               axis=0),
+                                zonMeanDa.lat,
+                                np.arange(1, 14),
+                                cbar_flag=False,
+                                conts=levels,
+                                dataId=plotId,
+                                extend=['both', 'max'][
+                                        1 if plotVar in ['PRECT', 'PRECL', 'PRECL']
+                                        else 0],
+                                grid_flag=True,
+                                latLim=latLim,
+                                varName=plotVar,
+                                varUnits=zonMeanDa.units,
+                                xticks=np.arange(1, 14),
+                                xtickLabels=['J', 'F', 'M', 'A', 'M', 'J',
+                                             'J', 'A', 'S', 'O', 'N', 'D',
+                                             'J'],
+                                )
+
+        # Add longitude limits to first subplot
+        if jSet == 0:
+            ax = plt.gca()
+            ax.annotate(r'$\theta$=[{:0d}, {:0d}]'.format(lonLim[0],
+                                                          lonLim[-1]),
+                        xy=(1, 1),
+                        xycoords='axes fraction',
+                        horizontalalignment='right',
+                        verticalalignment='bottom'
+                        )
+
+        # Only label outermost axes
+        if colInds[jSet] > 0:
+            plt.ylabel('')
+        if rowInds[jSet] < 2:
+            plt.xlabel('')
+
+    # Add colorbar
+    if cbar_flag:
+        # Create axis for colorbar
+        cbar_ax = plt.subplot(gs[cbRowInd:, cbColInd:])
+
+        # Create colorbar and set position
+        hcb = plt.colorbar(c1,
+                           cax=cbar_ax,
+                           orientation='vertical'
+                           )
+        # Futz with colorbar position
+        pcb = cbar_ax.get_position()
+        cbar_ax.set_position([pcb.x0-0.01, pcb.y0 + pcb.height/6.,
+                              0.015, pcb.height*2./3.])
+
+        # Label colorbar with variable name and units
+        cbar_ax.set_ylabel(
+            (r'$\Delta$' if diff_flag else '') +
+            mwp.getplotvarstring(dsDict[plotIdList[0]][plotVar].name) +
+            ' (' +
+            mwfn.getstandardunitstring(
+                dsDict[plotIdList[0]][plotVar].units) +
+            ')')
+
+        # Add colorbar ticks
+        # Add colorbar ticks and ensure compcont is labeled
+        if (not diff_flag) and (plotVar == 'PRECT'):
+            hcb.set_ticks(c1.levels[::2])
+        else:
+            try:
+                hcb.set_ticks(
+                    c1.levels[::2]
+                    if np.min(np.abs(c1.levels[::2] - compcont)) < 1e-10
+                    else c1.levels[1::2])
+            except TypeError:
+                pass
+
+    # Add date of figure creation if requested
+    if stampDate_flag:
+        mwp.stampdate(x=1, y=0)
+
+    # Save figure if requested
+    if save_flag:
+
+        # Set directory for saving
+        if saveDir is None:
+            saveDir = os.path.dirname(os.path.realpath(__file__))
+
+        # Set file name for saving
+        if diff_flag:
+            if all([diffIdList[j] == diffIdList[0]
+                    for j in range(len(diffIdList))]):
+                diffStr = 'd' + diffIdList[0][plotVar].srcid + '_'
+            else:
+                diffStr = ''
+
+            saveFile = ('d' + plotVar +
+                        '_latlon_comp{:d}_'.format(len(plotIdList)) +
+                        diffStr + '_' +
+                        mwp.getlatlimstring(latLim, '') + '_' +
+                        mwp.getlonlimstring(lonLim, '')
+                        )
+        else:
+            if len(plotIdList) > 3:
+                caseSaveString = 'comp{:d}'.format(len(plotIdList))
+            else:
+                caseSaveString = '_'.join([plotIdList])
+            saveFile = (
+                plotVar + '_zonmean_' +
+                caseSaveString + '_' +
+                mwp.getlatlimstring(latLim, '') + '_' +
+                mwp.getlonlimstring(lonLim, '')
                 )
 
         # Set saved figure size (inches)

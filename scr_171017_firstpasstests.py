@@ -92,13 +92,14 @@ if __name__ == '__main__':
     loadHadIsst_flag = True
     obs_flag = True
     ocnOnly_flag = True  # Need to implement to confirm CTindex is right.
-    plotBiasRelation_flag = True
+    plotBiasRelation_flag = False
     plotOneMap_flag = False
     plotMultiMap_flag = False
     plotGpcpTest_flag = False
-    plotRegMean_flag = True
+    plotRegMean_flag = False
+    plotZonRegMeanHov_flag = True
     prect_flag = True
-    save_flag = False
+    save_flag = True
     saveSubDir = 'testfigs/'
     verbose_flag = False
 
@@ -109,7 +110,8 @@ if __name__ == '__main__':
     ncDir, ncSubDir, saveDir = setfilepaths()
 
     # Set name(s) of file(s) to load
-    versionIds = ['01', '28', '36',
+    versionIds = ['01',
+                  '28', '36',
                   'ga7.66', '119', '125',
                   '161', '194', '195'
                   ]
@@ -368,7 +370,7 @@ if __name__ == '__main__':
 
         for vid in versionIds:
             # Compute regional mean through time
-            regMeanDs = mwfn.calcdsregmean(dataSets[vid][plotVar],
+            regMeanDs = mwfn.calcdaregmean(dataSets[vid][plotVar],
                                            gwDa=dataSets[vid]['gw'],
                                            latLim=latLim,
                                            lonLim=lonLim,
@@ -381,7 +383,7 @@ if __name__ == '__main__':
 
             # Compute reference regional mean if needed
             if rmRefRegMean_flag:
-                refRegMeanDs = mwfn.calcdsregmean(
+                refRegMeanDs = mwfn.calcdaregmean(
                     dataSets[vid][plotVar],
                     gwDa=dataSets[vid]['gw'],
                     latLim=refLatLim,
@@ -410,14 +412,14 @@ if __name__ == '__main__':
             obsDs = hadIsstDs
             obsVar = 'sst'
 
-            obsRegMeanDs = mwfn.calcdsregmean(obsDs[obsVar],
+            obsRegMeanDs = mwfn.calcdaregmean(obsDs[obsVar],
                                               gwDa=None,
                                               latLim=latLim,
                                               lonLim=lonLim,
                                               stdUnits_flag=True,
                                               )
             if rmRefRegMean_flag:
-                obsRefRegMeanDs = mwfn.calcdsregmean(obsDs[obsVar],
+                obsRefRegMeanDs = mwfn.calcdaregmean(obsDs[obsVar],
                                                      gwDa=None,
                                                      latLim=refLatLim,
                                                      lonLim=refLonLim,
@@ -569,3 +571,121 @@ if __name__ == '__main__':
         plt.xlabel('Cold Tongue Index')
         plt.ylabel('Double-ITCZ Index')
         plt.legend()
+
+# %% Plot zonal mean hovmoller
+    if plotZonRegMeanHov_flag:
+
+        # Set flags and options
+        latLim = np.array([-20, 20])
+        lonLim = np.array([210, 260])
+
+        plotVar = 'PRECT'
+        vid = '01'
+
+        # Plot versions
+        c1to2p.plotmultizonregmean(dataSets,
+                                   versionIds,
+                                   plotVar,
+                                   cbar_flag=True,
+                                   compcont_flag=False,
+                                   diff_flag=False,
+                                   diffIdList=None,
+                                   diffDs=None,
+                                   diffVar=None,
+                                   fontSize=12,
+                                   latLim=latLim,
+                                   latlbls=None,
+                                   lonLim=lonLim,
+                                   ocnOnly_flag=False,
+                                   save_flag=save_flag,
+                                   saveDir=setfilepaths()[2] + saveSubDir,
+                                   stdUnits_flag=True,
+                                   subFigCountStart='a',
+                                   )
+
+        # Plot obs for reference
+        if obs_flag:
+            if plotVar in ['PRECT', 'PRECC', 'PRECL']:
+                obsDs = gpcpClimoDs
+                obsVar = 'precip'
+            elif plotVar in ['TS']:
+                obsDs = hadIsstDs
+                obsVar = 'sst'
+
+            plt.figure()
+
+            zonMeanObsDa = mwfn.calcdaregzonmean(obsDs[obsVar],
+                                                 gwDa=None,
+                                                 latLim=latLim,
+                                                 lonLim=lonLim,
+                                                 ocnOnly_flag=False,
+                                                 qc_flag=False,
+                                                 landFracDa=None,
+                                                 stdUnits_flag=True,
+                                                 )
+
+            mwp.plotzonmean(np.concatenate((zonMeanObsDa.values,
+                                            zonMeanObsDa.values[:1, :]),
+                                           axis=0),
+                            zonMeanObsDa.lat,
+                            np.arange(1, 14),
+                            cbar_flag=True,
+                            conts=c1to2p.getzonmeancontlevels(obsVar),
+                            dataId=obsDs.id,
+                            extend=['both', 'max'][
+                                1 if plotVar in ['PRECT', 'PRECL', 'PRECL']
+                                else 0],
+                            grid_flag=True,
+                            latLim=latLim,
+                            varName=plotVar,
+                            varUnits=zonMeanObsDa.units,
+                            xticks=np.arange(1, 14),
+                            xtickLabels=['J', 'F', 'M', 'A', 'M', 'J',
+                                         'J', 'A', 'S', 'O', 'N', 'D',
+                                         'J'],
+                            )
+
+            if save_flag:
+                mwp.savefig(setfilepaths()[2] +
+                            saveSubDir + plotVar + '_zonmean_' +
+                            mwp.getlatlimstring(latLim, '') + '_' +
+                            mwp.getlonlimstring(lonLim, '') +
+                            'obs')
+
+
+# %%
+    if False:
+        for vid in versionIds:
+
+            # Compute zonal mean
+            zonMeanDa = mwfn.calcdaregzonmean(dataSets[vid][plotVar],
+                                              gwDa=dataSets[vid]['gw'],
+                                              latLim=latLim,
+                                              lonLim=lonLim,
+                                              ocnOnly_flag=ocnOnly_flag,
+                                              qc_flag=False,
+                                              landFracDa=(
+                                                  dataSets[vid]['LANDFRAC']),
+                                              stdUnits_flag=True,
+                                              )
+
+            mwp.plotzonmean(np.concatenate((zonMeanDa.values,
+                                            zonMeanDa.values[:1, :]),
+                                           axis=0),
+                            zonMeanDa.lat,
+                            np.arange(1, 14),
+                            cbar_flag=True,
+                            conts=None,
+                            dataId=vid,
+                            extend=['both', 'max'][
+                                1 if plotVar in ['PRECT', 'PRECL', 'PRECL']
+                                else 0],
+                            grid_flag=True,
+                            latLim=latLim,
+                            varName=plotVar,
+                            varUnits=zonMeanDa.units,
+                            xticks=np.arange(1, 14),
+                            xtickLabels=['J', 'F', 'M', 'A', 'M', 'J',
+                                         'J', 'A', 'S', 'O', 'N', 'D',
+                                         'J'],
+                            )

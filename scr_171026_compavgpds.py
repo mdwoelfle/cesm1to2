@@ -178,7 +178,7 @@ if __name__ == '__main__':
             except NameError:
                 obsDs = None
             obsVar = 'precip'
-            ocnOnly_flag = ocnOnly_flag 
+            ocnOnly_flag = ocnOnly_flag
             rmRefRegMean_flag = False
             yLim = np.array([1.00, 2.75])
         else:
@@ -299,7 +299,7 @@ if __name__ == '__main__':
 
         if save_flag:
             if plotVar in ['PRECT', 'PRECC', 'PRECL']:
-                mwp.savefig(saveDir + 
+                mwp.savefig(saveDir +
                             'annmean_dITCZindex_v{:s}'.format(versionId))
             elif plotVar in ['TS']:
                 mwp.savefig(saveDir + 'testfigs/' +

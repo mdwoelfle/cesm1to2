@@ -96,10 +96,10 @@ if __name__ == '__main__':
     plotOneMap_flag = False
     plotMultiMap_flag = False
     plotGpcpTest_flag = False
-    plotRegMean_flag = False
-    plotZonRegMeanHov_flag = True
+    plotRegMean_flag = True
+    plotZonRegMeanHov_flag = False
     prect_flag = True
-    save_flag = True
+    save_flag = False
     saveSubDir = 'testfigs/'
     verbose_flag = False
 
@@ -334,27 +334,36 @@ if __name__ == '__main__':
 
     if plotRegMean_flag:
 
-        # Set flags
-        rmRefRegMean_flag = True
-        refLatLim = np.array([-20, 20])
-        refLonLim = np.array([150, 250])
+        # Set variable for plotting
+        plotVar = 'PRECT'
 
-        if plotVar in ['PRECT']:
-            yLim = np.array([1, 3])
+        if plotVar in ['PRECT', 'PRECL', 'PRECC']:
+            yLim = np.array([1, 2.7])
+            rmRefRegMean_flag = False
+            latLim = np.array([-20, 0])
+            lonLim = np.array([210, 260])
+            obsDs = gpcpClimoDs
+            obsVar = 'precip'
         elif plotVar in ['TS']:
+            # Set flags
+            rmRefRegMean_flag = True
+            # Set lat/lon limits
+            latLim = np.array([-3, 3])
+            lonLim = np.array([180, 220])
+            refLatLim = np.array([-20, 20])
+            refLonLim = np.array([150, 250])
             if rmRefRegMean_flag:
                 yLim = np.array([-2.0, 1.0])
             else:
                 yLim = np.array([297, 301])
+            obsDs = hadIsstDs
+            obsVar = 'sst'
         else:
             yLim = None
 
         # Create dictionary to hold annual mean value (and colors)
         annMean = dict()
         colorDict = dict()
-
-        # Set variable for plotting
-        plotVar = 'TS'
 
         # Create figure for plotting
         plt.figure()
@@ -363,8 +372,8 @@ if __name__ == '__main__':
         #   Bellucci et al. (2010, J Clim)
         # latLim = np.array([-20, 0])
         # lonLim = np.array([210, 260])
-        latLim = np.array([-3, 3])
-        lonLim = np.array([180, 220])
+        # latLim = np.array([-3, 3])
+        # lonLim = np.array([180, 220])
         # latLim = np.array([-20, 20])
         # lonLim = np.array([150, 250])
 
@@ -405,28 +414,22 @@ if __name__ == '__main__':
             colorDict[vid] = hl.get_color()
 
         # Repeat above for obs
-        if plotVar in ['PRECC', 'PRECL', 'PRECT']:
-            obsDs = gpcpClimoDs
-            obsVar = 'precip'
-        elif plotVar in ['TS']:
-            obsDs = hadIsstDs
-            obsVar = 'sst'
 
-            obsRegMeanDs = mwfn.calcdaregmean(obsDs[obsVar],
-                                              gwDa=None,
-                                              latLim=latLim,
-                                              lonLim=lonLim,
-                                              stdUnits_flag=True,
-                                              )
-            if rmRefRegMean_flag:
-                obsRefRegMeanDs = mwfn.calcdaregmean(obsDs[obsVar],
-                                                     gwDa=None,
-                                                     latLim=refLatLim,
-                                                     lonLim=refLonLim,
-                                                     stdUnits_flag=True,
-                                                     )
+        obsRegMeanDs = mwfn.calcdaregmean(obsDs[obsVar],
+                                          gwDa=None,
+                                          latLim=latLim,
+                                          lonLim=lonLim,
+                                          stdUnits_flag=True,
+                                          )
+        if rmRefRegMean_flag:
+            obsRefRegMeanDs = mwfn.calcdaregmean(obsDs[obsVar],
+                                                 gwDa=None,
+                                                 latLim=refLatLim,
+                                                 lonLim=refLonLim,
+                                                 stdUnits_flag=True,
+                                                 )
 
-                obsRegMeanDs = obsRegMeanDs - obsRefRegMeanDs
+            obsRegMeanDs = obsRegMeanDs - obsRefRegMeanDs
 
         hl, = plt.plot(np.arange(1, 13),
                        obsRegMeanDs.values,
@@ -482,8 +485,12 @@ if __name__ == '__main__':
         plt.grid(ls='--')
         plt.gca().set_axisbelow(True)
 
-        # plt.title('Annual mean 2xITCZ index')
-        plt.title('Annual mean CT index')
+        if plotVar in ['PRECC', 'PRECL', 'PRECT']:
+            plt.title('Annual mean 2xITCZ index')
+        elif plotVar in ['TS']:
+            plt.title('Annual mean CT index')
+        else:
+            plt.title('Annual mean, regional mean')
 
     # Plot index through model versions
     # Use scatter plot with version on x-axis and index on y-axis
@@ -577,17 +584,17 @@ if __name__ == '__main__':
 
         # Set flags and options
         latLim = np.array([-20, 20])
-        lonLim = np.array([210, 260])
+        lonLim = np.array([180, 220])
 
-        plotVar = 'PRECT'
-        vid = '01'
+        plotVar = 'TS'
 
         # Plot versions
         c1to2p.plotmultizonregmean(dataSets,
                                    versionIds,
                                    plotVar,
                                    cbar_flag=True,
-                                   compcont_flag=False,
+                                   compcont_flag=True,
+                                   compcont=np.array([300.]),
                                    diff_flag=False,
                                    diffIdList=None,
                                    diffDs=None,
@@ -612,7 +619,9 @@ if __name__ == '__main__':
                 obsDs = hadIsstDs
                 obsVar = 'sst'
 
-            plt.figure()
+            hf = plt.figure()
+            hf.set_size_inches(7.05, 2.58,
+                               forward=True)
 
             zonMeanObsDa = mwfn.calcdaregzonmean(obsDs[obsVar],
                                                  gwDa=None,
@@ -631,6 +640,7 @@ if __name__ == '__main__':
                             np.arange(1, 14),
                             cbar_flag=True,
                             conts=c1to2p.getzonmeancontlevels(obsVar),
+                            compcont=np.array([300]),
                             dataId=obsDs.id,
                             extend=['both', 'max'][
                                 1 if plotVar in ['PRECT', 'PRECL', 'PRECL']
@@ -645,47 +655,18 @@ if __name__ == '__main__':
                                          'J'],
                             )
 
+            ax = plt.gca()
+            ax.annotate(r'$\theta$=[{:0d}, {:0d}]'.format(lonLim[0],
+                                                          lonLim[-1]),
+                        xy=(1, 1),
+                        xycoords='axes fraction',
+                        horizontalalignment='right',
+                        verticalalignment='bottom'
+                        )
+
             if save_flag:
                 mwp.savefig(setfilepaths()[2] +
                             saveSubDir + plotVar + '_zonmean_' +
                             mwp.getlatlimstring(latLim, '') + '_' +
                             mwp.getlonlimstring(lonLim, '') +
                             'obs')
-
-
-# %%
-    if False:
-        for vid in versionIds:
-
-            # Compute zonal mean
-            zonMeanDa = mwfn.calcdaregzonmean(dataSets[vid][plotVar],
-                                              gwDa=dataSets[vid]['gw'],
-                                              latLim=latLim,
-                                              lonLim=lonLim,
-                                              ocnOnly_flag=ocnOnly_flag,
-                                              qc_flag=False,
-                                              landFracDa=(
-                                                  dataSets[vid]['LANDFRAC']),
-                                              stdUnits_flag=True,
-                                              )
-
-            mwp.plotzonmean(np.concatenate((zonMeanDa.values,
-                                            zonMeanDa.values[:1, :]),
-                                           axis=0),
-                            zonMeanDa.lat,
-                            np.arange(1, 14),
-                            cbar_flag=True,
-                            conts=None,
-                            dataId=vid,
-                            extend=['both', 'max'][
-                                1 if plotVar in ['PRECT', 'PRECL', 'PRECL']
-                                else 0],
-                            grid_flag=True,
-                            latLim=latLim,
-                            varName=plotVar,
-                            varUnits=zonMeanDa.units,
-                            xticks=np.arange(1, 14),
-                            xtickLabels=['J', 'F', 'M', 'A', 'M', 'J',
-                                         'J', 'A', 'S', 'O', 'N', 'D',
-                                         'J'],
-                            )

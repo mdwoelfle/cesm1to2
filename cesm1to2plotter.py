@@ -942,9 +942,13 @@ def plotmultizonregmean(dsDict,
                                 np.arange(1, 14),
                                 cbar_flag=False,
                                 conts=levels,
+                                compcont=(compcont
+                                          if compcont_flag
+                                          else None),
                                 dataId=plotId,
                                 extend=['both', 'max'][
-                                        1 if plotVar in ['PRECT', 'PRECL', 'PRECL']
+                                        1 if plotVar in ['PRECT', 'PRECL',
+                                                         'PRECL']
                                         else 0],
                                 grid_flag=True,
                                 latLim=latLim,
@@ -1010,6 +1014,11 @@ def plotmultizonregmean(dsDict,
             except TypeError:
                 pass
 
+        if compcont is not None:
+            boldLoc = ((compcont - c1.levels[0]) /
+                       (c1.levels[-1] - c1.levels[0]))
+            hcb.ax.hlines(boldLoc, 0, 1, colors='k', linewidth=1)
+
     # Add date of figure creation if requested
     if stampDate_flag:
         mwp.stampdate(x=1, y=0)
@@ -1052,7 +1061,7 @@ def plotmultizonregmean(dsDict,
         fy = hf.get_size_inches()[1]
 
         # Save figure
-        print(saveDir + saveFile)
+        # tprint(saveDir + saveFile)
         mwp.savefig(saveDir + saveFile,
                     shape=np.array([fx, fy]))
         plt.close('all')

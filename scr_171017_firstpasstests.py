@@ -88,6 +88,7 @@ if __name__ == '__main__':
 
     # Set options/flags
     diff_flag = False
+    loadErai_flag = True  # True to load ERAI fields
     loadGpcp_flag = True
     loadHadIsst_flag = True
     obs_flag = True
@@ -99,6 +100,7 @@ if __name__ == '__main__':
     plotRegMean_flag = True
     plotZonRegMeanHov_flag = False
     prect_flag = True
+    reload_flag = False
     save_flag = False
     saveSubDir = 'testfigs/'
     verbose_flag = False
@@ -136,8 +138,17 @@ if __name__ == '__main__':
                      for j in range(len(versionIds))}
 
     # Open netcdf file(s)
-    dataSets = {versionId: xr.open_mfdataset(loadFileLists[versionId])
-                for versionId in versionIds}
+    try:
+        if not all([vid in dataSets.keys() for vid in versionIds]):
+            load_flag = True
+        else:
+            load_flag = False
+    except NameError:
+        load_flag = True
+
+    if load_flag or reload_flag:
+        dataSets = {versionId: xr.open_mfdataset(loadFileLists[versionId])
+                    for versionId in versionIds}
 
     # Compute PRECT if needed
     if prect_flag:
@@ -180,6 +191,18 @@ if __name__ == '__main__':
                                          regrid_flag=True,
                                          whichHad='pd_monclimo',
                                          )
+# %%
+        if loadErai_flag:
+            eraiDs = mwfn.loaderai(daNewGrid=None,
+                                   kind='linear',
+                                   loadClimo_flag=True,
+                                   newGridFile=None,
+                                   newGridName='0.9x1.25',
+                                   newLat=None,
+                                   newLon=None,
+                                   regrid_flag=False,
+                                   whichErai='monmean',
+                                   )
 
     # Set variable of interest
     plotVars = ['PRECC']  # , 'TS', 'TAUX']
@@ -207,13 +230,13 @@ if __name__ == '__main__':
     tSteps = np.arange(0, 12)
 
     if plotOneMap_flag:
-        plotVar = 'sst'
+        plotVar = 'sp'
 
         # Create figure for plotting
         hf = plt.figure()
 
         # Plot some fields for comparison
-        c1to2p.plotlatlon(hadIsstDs,
+        c1to2p.plotlatlon(eraiDs,
                           plotVar,
                           box_flag=False,
                           caseString=None,
@@ -296,7 +319,7 @@ if __name__ == '__main__':
 
 # %% Plot multiple maps
     if plotMultiMap_flag:
-        plotVars = ['TS']
+        plotVars = ['PS']
         for plotVar in plotVars:
             c1to2p.plotmultilatlon(dataSets,
                                    versionIds,
@@ -344,6 +367,17 @@ if __name__ == '__main__':
             lonLim = np.array([210, 260])
             obsDs = gpcpClimoDs
             obsVar = 'precip'
+            title = '2xITCZ Index'
+        elif plotVar in ['PS']:
+            rmRefRegMean_flag = True
+            latLim = np.array([-5, 5])
+            lonLim = np.array([240, 270])
+            refLatLim = np.array([-5, 5])
+            refLonLim = np.array([150, 180])
+            obsDs = eraiDs
+            obsVar = 'sp'
+            title = 'Pressure gradient for Walker (E-W)'
+            yLim = None
         elif plotVar in ['TS']:
             # Set flags
             rmRefRegMean_flag = True
@@ -358,6 +392,7 @@ if __name__ == '__main__':
                 yLim = np.array([297, 301])
             obsDs = hadIsstDs
             obsVar = 'sst'
+            title = 'Cold Tongue Index'
         else:
             yLim = None
 
@@ -454,7 +489,7 @@ if __name__ == '__main__':
         plt.legend(title='Version')
 
         # plt.title('Seasonal cycle of 2xITCZ index')
-        plt.title('Seasonal cycle of CT index')
+        plt.title('Seasonal cycle of {:s}'.format(title))
 
         # Plot annual mean values
         plt.figure()
@@ -485,12 +520,7 @@ if __name__ == '__main__':
         plt.grid(ls='--')
         plt.gca().set_axisbelow(True)
 
-        if plotVar in ['PRECC', 'PRECL', 'PRECT']:
-            plt.title('Annual mean 2xITCZ index')
-        elif plotVar in ['TS']:
-            plt.title('Annual mean CT index')
-        else:
-            plt.title('Annual mean, regional mean')
+        plt.title('Annual mean {:s}'.format(title))
 
     # Plot index through model versions
     # Use scatter plot with version on x-axis and index on y-axis
@@ -586,7 +616,7 @@ if __name__ == '__main__':
         latLim = np.array([-20, 20])
         lonLim = np.array([180, 220])
 
-        plotVar = 'TS'
+        plotVar = 'PS'
 
         # Plot versions
         c1to2p.plotmultizonregmean(dataSets,
@@ -618,6 +648,9 @@ if __name__ == '__main__':
             elif plotVar in ['TS']:
                 obsDs = hadIsstDs
                 obsVar = 'sst'
+            elif plotVar in ['PS']:
+                obsDs = eraiDs
+                obsVar = 'sp'
 
             hf = plt.figure()
             hf.set_size_inches(7.05, 2.58,

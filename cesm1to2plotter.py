@@ -247,6 +247,7 @@ def getzonmeancontlevels(plotVar,
                       'ekmanx': np.arange(-1.5e5, 1.501e5, 1.5e4),
                       'ekmany': np.arange(-3e4, 3.01e4, 3e3),
                       'precip': np.arange(0, 20.1, 2),
+                      'sp': np.arange(1004., 1013.1, 1),
                       'sst': np.arange(290, 305, 1),
                       'sverdrupx': np.arange(-1.5e5, 1.501e5, 1.5e4),
                       'MGx': np.arange(-1.5e5, 1.501e5, 1.5e4)
@@ -421,7 +422,7 @@ def plotlatlon(ds,
             rmRegLonLim = lonLim
 
         # Compute regional mean through time
-        regMeanDs = mwfn.calcdsregmean(ds[plotVar],
+        regMeanDs = mwfn.calcdaregmean(ds[plotVar],
                                        gwDa=(ds['gw']
                                              if 'gw' in ds
                                              else None),

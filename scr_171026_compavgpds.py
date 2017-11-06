@@ -221,7 +221,7 @@ if __name__ == '__main__':
 
             for yid in yrIds:
                 # Compute regional mean through time
-                regMeanDs = mwfn.calcdsregmean(dataSets[yid][plotVar],
+                regMeanDa = mwfn.calcdaregmean(dataSets[yid][plotVar],
                                                gwDa=dataSets[yid]['gw'],
                                                latLim=latLim,
                                                lonLim=lonLim,
@@ -234,7 +234,7 @@ if __name__ == '__main__':
 
                 # Compute reference regional mean if needed
                 if rmRefRegMean_flag:
-                    refRegMeanDs = mwfn.calcdsregmean(
+                    refRegMeanDa = mwfn.calcdaregmean(
                         dataSets[yid][plotVar],
                         gwDa=dataSets[yid]['gw'],
                         latLim=refLatLim,
@@ -244,13 +244,13 @@ if __name__ == '__main__':
                         qc_flag=False,
                         stdUnits_flag=True,
                         )
-                    regMeanDs = regMeanDs - refRegMeanDs
+                    regMeanDa = regMeanDa - refRegMeanDa
 
-                annMean[yid] = regMeanDs.mean(dim='time')
+                annMean[yid] = regMeanDa.mean(dim='time')
 
             # Compute regional mean of observations
             if plotObs_flag:
-                obsRegMeanDs = mwfn.calcdsregmean(obsDs[obsVar],
+                obsRegMeanDa = mwfn.calcdaregmean(obsDs[obsVar],
                                                   gwDa=None,
                                                   latLim=latLim,
                                                   lonLim=lonLim,
@@ -258,16 +258,16 @@ if __name__ == '__main__':
                                                   )
                 # Compute regional mean of reference region for observations
                 if rmRefRegMean_flag:
-                    obsRefRegMeanDs = mwfn.calcdsregmean(obsDs[obsVar],
+                    obsRefRegMeanDa = mwfn.calcdaregmean(obsDs[obsVar],
                                                          gwDa=None,
                                                          latLim=refLatLim,
                                                          lonLim=refLonLim,
                                                          stdUnits_flag=True,
                                                          )
 
-                    obsRegMeanDs = obsRegMeanDs - obsRefRegMeanDs
+                    obsRegMeanDa = obsRegMeanDa - obsRefRegMeanDa
 
-                annMean['obs'] = obsRegMeanDs.mean(dim='time')
+                annMean['obs'] = obsRegMeanDa.mean(dim='time')
 
             # Plot annual mean values
             plt.figure()

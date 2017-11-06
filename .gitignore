@@ -11,3 +11,6 @@ installers/
 temp/
 mdwtools/
 mdwtools
+
+# Random files to ignore (no idea where it came from)
+core

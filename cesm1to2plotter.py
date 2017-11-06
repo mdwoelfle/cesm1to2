@@ -52,7 +52,7 @@ def getavailableyearslist(versionId):
             '36': ['2-10', '2-20', '21-40', '60-60', '75-99'],
             'ga7.66': ['2-20', '20-39', '55-74'],
             '119': ['2-9', '2-21', '21-40', '30-49', '75-99'],
-            '125': ['2-9', '2-21', '11-30', '21-40', '30-49', '70-89', '80-99',
+            '125': ['2-9', '2-21', '11-30', '21-40', '70-89', '80-99',
                     '100-109', '100-119'],
             '161': ['1850-1869', '1920-1939', '1980-1999'],
             '194': ['14-33', '15-29', '50-69', '100-119'],
@@ -205,6 +205,18 @@ def getcompcont(plotVar,
         compcont = np.array([0])
 
     return compcont
+
+
+def getyearsubdirs(versionId):
+    """
+    Get sudirectories for years as apparently formatting is inconsistent.
+    """
+    if versionId == '28':
+        return ['yrs_2-10', 'yrs_2-20', 'yrs50-74', 'yrs75-99']
+    else:
+        yrIds = getavailableyearslist(versionId)
+        return ['yrs_{:s}'.format(yid)
+                for yid in yrIds]
 
 
 def plotlatlon(ds,

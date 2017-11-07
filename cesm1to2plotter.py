@@ -43,6 +43,64 @@ import multiprocessing as mp  # Allow use of multiple cores
 # %% Define functions
 
 
+def calcregmeanindex(ds,
+                     indexName,
+                     indexType=None,
+                     indexVar=None,
+                     ocnOnly_flag=False,
+                     ):
+    """
+    Compute regional mean indices
+    - CTI - cold tongue index
+    - dITCZ - double-ITCZ index
+    - walker - Walker circulation index (based on pressure)
+    """
+
+    # Choose appropriate index to compute
+    if indexName.lower() in ['cti']:
+        # Assign default index if none provided
+        if indexType is None:
+            indexType = 'Woelfleetal2017'
+        if indexVar is None:
+            indexVar = 'TS'
+
+        # Compute cold tongue index
+        indexDa = mwfn.calcdsctindex(ds,
+                                     indexType=indexType,
+                                     sstVar=indexVar,
+                                     )
+
+    elif indexName.lower() in ['ditcz']:
+        # Assign default index if none provided
+        if indexType is None:
+            indexType = 'Bellucci2010'
+        if indexVar is None:
+            indexVar = 'PRECT'
+
+        # Compute double-ITCZ index
+        indexDa = mwfn.calcdsditczindex(ds,
+                                        indexType='Bellucci2010',
+                                        precipVar=indexVar,
+                                        )
+
+    elif indexName.lower() in ['walker']:
+        # Assign default index if none provided
+        if indexType is None:
+            indexType = 'testing'
+        if indexVar is None:
+            indexVar = 'PS'
+
+        # Compute Walker circulation index
+        indexDa = mwfn.calcdswalkerindex(ds,
+                                         indexType=indexType,
+                                         ocnOnly_flag=ocnOnly_flag,
+                                         pressureVar=indexVar,
+                                         )
+
+    # Return index data array
+    return indexDa
+
+
 def getavailableyearslist(versionId):
     """
     Get list of averaging periods available for a given model version

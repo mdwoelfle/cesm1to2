@@ -93,11 +93,11 @@ if __name__ == '__main__':
     loadHadIsst_flag = True
     obs_flag = True
     ocnOnly_flag = True  # Need to implement to confirm CTindex is right.
-    plotBiasRelation_flag = False
+    plotBiasRelation_flag = True
     plotOneMap_flag = False
     plotMultiMap_flag = False
     plotGpcpTest_flag = False
-    plotRegMean_flag = True
+    plotRegMean_flag = False
     plotZonRegMeanHov_flag = False
     prect_flag = True
     reload_flag = False
@@ -191,7 +191,7 @@ if __name__ == '__main__':
                                          regrid_flag=True,
                                          whichHad='pd_monclimo',
                                          )
-# %%
+
         if loadErai_flag:
             eraiDs = mwfn.loaderai(daNewGrid=None,
                                    kind='linear',
@@ -353,12 +353,12 @@ if __name__ == '__main__':
                                    tSteps=np.arange(0, 12),
                                    )
 
-# %% Compute differences in biases more analytically across versions
+# %% Plot regional means
 
     if plotRegMean_flag:
 
         # Set variable for plotting
-        plotVar = 'PRECT'
+        plotVar = 'PS'
 
         if plotVar in ['PRECT', 'PRECL', 'PRECC']:
             yLim = np.array([1, 2.7])
@@ -367,6 +367,7 @@ if __name__ == '__main__':
             lonLim = np.array([210, 260])
             obsDs = gpcpClimoDs
             obsVar = 'precip'
+            ocnOnly_flag = False
             title = '2xITCZ Index'
         elif plotVar in ['PS']:
             rmRefRegMean_flag = True
@@ -376,6 +377,7 @@ if __name__ == '__main__':
             refLonLim = np.array([150, 180])
             obsDs = eraiDs
             obsVar = 'sp'
+            ocnOnly_flag = False
             title = 'Pressure gradient for Walker (E-W)'
             yLim = None
         elif plotVar in ['TS']:
@@ -392,6 +394,7 @@ if __name__ == '__main__':
                 yLim = np.array([297, 301])
             obsDs = hadIsstDs
             obsVar = 'sst'
+            ocnOnly_flag = True
             title = 'Cold Tongue Index'
         else:
             yLim = None
@@ -527,63 +530,93 @@ if __name__ == '__main__':
 
     # Change x-axis labels to be model version rather than generic number
 
-# %% Correlate biases (dITCZ and CT)
+# %% Correlate bias indices (CTI, dTICZ, Walker)
     if plotBiasRelation_flag:
-        annMeanItcz = dict()
-        annMeanCt = dict()
 
-        # Compute double-ITCZ index
+        # Options: 'CTI', 'dITCZ', 'Walker'
+        index1 = 'CTI'  # x axis
+        index2 = 'dITCZ'  # y axis
+
+        annMean1 = dict()
+        annMean2 = dict()
+
+        # Set index details
+        indexTypes = {'cti': 'Woelfleetal2017',
+                      'ditcz': 'Bellucci2010',
+                      'walker': 'testing'}
+        indexVars = {'cti': 'TS',
+                     'ditcz': 'PRECT',
+                     'walker': 'PS'}
+        labelDict = {'cti': 'Cold Tongue Index (K)',
+                     'ditcz': 'Double-ITCZ Index (mm/d)',
+                     'walker': 'Walker Circulation Index (hPa)'}
+        obsDict = {'cti': hadIsstDs,
+                   'ditcz': gpcpClimoDs,
+                   'walker': eraiDs}
+        obsVars = {'cti': 'sst',
+                   'ditcz': 'precip',
+                   'walker': 'sp'}
+
+        # Compute indices for various model versions
         for vid in versionIds:
 
-            # Compute regional mean through time
-            regMeanDs = mwfn.calcdsditczindex(dataSets[vid],
-                                              indexType='Bellucci2010',
-                                              precipVar='PRECT',
-                                              )
-            annMeanItcz[vid] = regMeanDs.mean(dim='time')
+            # Compute first index
+            index1Da = c1to2p.calcregmeanindex(
+                dataSets[vid],
+                index1,
+                indexType=indexTypes[index1.lower()],
+                indexVar=indexVars[index1.lower()],
+                ocnOnly_flag=False)
+            annMean1[vid] = index1Da.mean(dim='time')
 
-        # Compute observed double-ITCZ index
-        regMeanDs = mwfn.calcdsditczindex(gpcpClimoDs,
-                                          indexType='Bellucci2010',
-                                          precipVar='precip')
-        annMeanItcz['obs'] = regMeanDs.mean(dim='time')
+            # Compute second index
+            index2Da = c1to2p.calcregmeanindex(
+                dataSets[vid],
+                index2,
+                indexType=indexTypes[index2.lower()],
+                indexVar=indexVars[index2.lower()],
+                ocnOnly_flag=False)
+            annMean2[vid] = index2Da.mean(dim='time')
 
-        # Compute cold tongue index
-        for vid in versionIds:
-            # Compute regional mean through time
-            regMeanDs = mwfn.calcdsctindex(dataSets[vid],
-                                           indexType='Woelfleetal2017',
-                                           sstVar='TS',
-                                           )
-            annMeanCt[vid] = regMeanDs.mean(dim='time')
+        # Compute indices for observations
+        #   (reference only; not in correlation)
+        obs1Da = c1to2p.calcregmeanindex(
+            obsDict[index1.lower()],
+            index1,
+            indexType=indexTypes[index1.lower()],
+            indexVar=obsVars[index1.lower()],
+            ocnOnly_flag=False)
+        annMean1['obs'] = obs1Da.mean(dim='time')
 
-        # Compute observed cold tongue index
-        regMeanDs = mwfn.calcdsctindex(hadIsstDs,
-                                       indexType='Woelfleetal2017',
-                                       sstVar='sst')
-        annMeanCt['obs'] = regMeanDs.mean(dim='time')
+        obs2Da = c1to2p.calcregmeanindex(
+            obsDict[index2.lower()],
+            index2,
+            indexType=indexTypes[index2.lower()],
+            indexVar=obsVars[index2.lower()],
+            ocnOnly_flag=False)
+        annMean2['obs'] = obs2Da.mean(dim='time')
 
         # Plot versus one another as scatter plot
         plt.figure()
 
-        # Plot line to show vresion path through scatterplot
-        plt.plot(np.array([annMeanCt[vid] for vid in versionIds]),
-                 np.array([annMeanItcz[vid] for vid in versionIds]),
+        # Plot line to show version path through scatterplot
+        plt.plot(np.array([annMean1[vid] for vid in versionIds]),
+                 np.array([annMean2[vid] for vid in versionIds]),
                  c='k',
                  label=None,
                  zorder=1)
 
         for vid in versionIds:
-            plt.scatter(annMeanCt[vid],
-                        annMeanItcz[vid],
+            plt.scatter(annMean1[vid],
+                        annMean2[vid],
                         marker='o',
                         s=80,
                         c=getcolordict()[vid],
                         label=vid,
                         zorder=2
                         )
-        plt.scatter(annMeanCt['obs'],
-                    annMeanItcz['obs'],
+        plt.scatter(annMean1['obs'],
+                    annMean2['obs'],
                     marker='^',
                     s=80,
                     c=getcolordict()['obs'],
@@ -591,9 +624,9 @@ if __name__ == '__main__':
 
         # Compute correlation between cold tongue index and double-ITCZ index
         #   across model versions
-        r = np.corrcoef(np.array([annMeanCt[vid]
+        r = np.corrcoef(np.array([annMean1[vid]
                                   for vid in versionIds]),
-                        np.array([annMeanItcz[vid]
+                        np.array([annMean2[vid]
                                   for vid in versionIds]))[0, 1]
 
         # Add correlation to plot as annotation
@@ -605,8 +638,8 @@ if __name__ == '__main__':
                            )
 
         # Dress plot
-        plt.xlabel('Cold Tongue Index')
-        plt.ylabel('Double-ITCZ Index')
+        plt.xlabel(labelDict[index1.lower()])
+        plt.ylabel(labelDict[index2.lower()])
         plt.legend()
 
 # %% Plot zonal mean hovmoller

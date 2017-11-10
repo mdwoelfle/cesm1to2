@@ -168,6 +168,8 @@ def getcompcont(plotVar,
                         'TAUX': np.array([0]),
                         'TAUY': np.array([0]),
                         'TS': np.array([300]),
+                        'U': np.array([0]),
+                        'V': np.array([0]),
                         'curlTau': np.array([0]),
                         'curlTau_y': np.array([0]),
                         'divTau': np.array([0]),
@@ -204,35 +206,7 @@ def getmapcontlevels(plotVar,
     Kwargs:
         diff_flag - true if plotting difference in variable
     """
-    if not diff_flag:
-        try:
-            levels = {'FLNS': np.arange(0., 120.1, 10),
-                      'FNS': np.arange(-600., 600.1, 100),
-                      'FSNS': np.arange(0, 400.1, 20.),
-                      'LHFLX': np.arange(0, 200.1, 10),
-                      'OMEGA500': np.arange(-0.125, 0.1251, 0.0125),
-                      'OMEGA850': np.arange(-0.125, 0.1251, 0.0125),
-                      'PRECC': np.arange(0, 20.1, 2),
-                      'PRECL': np.arange(0, 20.1, 2),
-                      'PRECT': np.arange(0, 20.1, 2),
-                      'PS': np.arange(1004., 1013.1, 1),
-                      'SHFLX': np.arange(0, 20., 1.),
-                      'TAUX': np.arange(-0.2, 0.201, 0.02),
-                      'TAUY': np.arange(-0.1, 0.101, 0.01),
-                      'TS': np.arange(290, 305, 1),
-                      'curlTau': np.arange(-3e-7, 3.001e-7, 3e-8),
-                      'curlTau_y': np.arange(-4e-13, 4.01e-13, 4e-14),
-                      'divTau': np.arange(-2e-7, 2.01e-7, 2e-8),
-                      'ekmanx': np.arange(-1.5e5, 1.501e5, 1.5e4),
-                      'ekmany': np.arange(-3e4, 3.01e4, 3e3),
-                      'precip': np.arange(0, 20.1, 2),
-                      'sst': np.arange(290, 305, 1),
-                      'sverdrupx': np.arange(-1.5e5, 1.501e5, 1.5e4),
-                      'MGx': np.arange(-1.5e5, 1.501e5, 1.5e4)
-                      }[plotVar]
-        except KeyError:
-            levels = None
-    else:
+    if diff_flag:
         try:
             levels = {'FLNS': np.arange(-30., 30.1, 3),
                       # 'FNS': np.arange(-600., 600.1, 100),
@@ -249,6 +223,7 @@ def getmapcontlevels(plotVar,
                       'TAUX': np.arange(-0.1, 0.101, 0.01),
                       'TAUY': np.arange(-0.1, 0.101, 0.01),
                       'TS': np.arange(-2, 2.1, 0.2),
+                      'U': np.arange(-15, 15.1, 1.5),
                       'curlTau': np.arange(-1.5e-7, 1.51e-7, 1.5e-8),
                       'curlTau_y': np.arange(-4e-13, 4.01e-13, 4e-14),
                       'divTau': np.arange(-1e-7, 1.01e-7, 1e-8),
@@ -258,6 +233,35 @@ def getmapcontlevels(plotVar,
                       'sst': np.arange(-2, 2.1, 0.2),
                       'sverdrupx': np.arange(-1.5e5, 1.501e5, 1.5e4),
                       'MGx': np.arange(-1.5e5, 1.501e5, 1.5e4)
+                      }[plotVar]
+        except KeyError:
+            levels = None
+    else:
+        try:
+            levels = {'FLNS': np.arange(0., 120.1, 10),
+                      'FNS': np.arange(-600., 600.1, 100),
+                      'FSNS': np.arange(0, 400.1, 20.),
+                      'LHFLX': np.arange(0, 200.1, 10),
+                      'MGx': np.arange(-1.5e5, 1.501e5, 1.5e4),
+                      'OMEGA500': np.arange(-0.125, 0.1251, 0.0125),
+                      'OMEGA850': np.arange(-0.125, 0.1251, 0.0125),
+                      'PRECC': np.arange(0, 20.1, 2),
+                      'PRECL': np.arange(0, 20.1, 2),
+                      'PRECT': np.arange(0, 20.1, 2),
+                      'PS': np.arange(1004., 1013.1, 1),
+                      'SHFLX': np.arange(0, 20., 1.),
+                      'TAUX': np.arange(-0.2, 0.201, 0.02),
+                      'TAUY': np.arange(-0.1, 0.101, 0.01),
+                      'TS': np.arange(290, 305, 1),
+                      'U': np.arange(-10, 10.1, 1.0),
+                      'curlTau': np.arange(-3e-7, 3.001e-7, 3e-8),
+                      'curlTau_y': np.arange(-4e-13, 4.01e-13, 4e-14),
+                      'divTau': np.arange(-2e-7, 2.01e-7, 2e-8),
+                      'ekmanx': np.arange(-1.5e5, 1.501e5, 1.5e4),
+                      'ekmany': np.arange(-3e4, 3.01e4, 3e3),
+                      'precip': np.arange(0, 20.1, 2),
+                      'sst': np.arange(290, 305, 1),
+                      'sverdrupx': np.arange(-1.5e5, 1.501e5, 1.5e4),
                       }[plotVar]
         except KeyError:
             levels = None
@@ -362,7 +366,7 @@ def plotlatlon(ds,
                box_flag=False,
                caseString=None,
                cbar_flag=True,
-               cbar_dy=0.001,
+               cbar_dy=-0.1,
                cbar_height=0.02,
                cMap=None,
                compcont=None,
@@ -370,6 +374,7 @@ def plotlatlon(ds,
                convertUnits_flag=True,
                diff_flag=False,
                diffDs=None,
+               diffPlev=None,
                diffTSteps=None,
                diffVar=None,
                fontSize=12,
@@ -380,6 +385,7 @@ def plotlatlon(ds,
                lonlbls=None,
                newUnits=None,
                ocnOnly_flag=False,
+               plev=None,
                qc_flag=False,
                quiver_flag=False,
                quiverScale=0.4,
@@ -393,6 +399,7 @@ def plotlatlon(ds,
                tStepLabel_flag=True,
                uVar='TAUX',
                vVar='TAUY',
+               verbose_flag=False,
                **kwargs
                ):
     """
@@ -413,7 +420,7 @@ def plotlatlon(ds,
         levels = getmapcontlevels(plotVar,
                                   diff_flag=any([diff_flag,
                                                  rmRegMean_flag])
-                                   )
+                                  )
     if compcont is None:
         compcont = getcompcont(plotVar,
                                diff_flag=any([diff_flag,
@@ -432,6 +439,10 @@ def plotlatlon(ds,
         tSteps = np.arange(0, ds[plotVar].shape[0], dtype=int)
     if diffTSteps is None:
         diffTSteps = tSteps
+
+    # Determine differencing pressure level if not provided
+    if diffPlev is None:
+        diffPlev = plev
 
     # Set caseString for plotting
     if caseString is None:
@@ -463,28 +474,62 @@ def plotlatlon(ds,
             pass
 
     # Pull data for plotting
-    if diff_flag:
-        pData = (ds[plotVar].values[tSteps, :, :].mean(axis=0) -
-                 diffDs[diffVar].values[diffTSteps, :, :].mean(axis=0))
-        if quiver_flag:
-            uData = (ds[uVar].data[tSteps, :, :].mean(axis=0) -
-                     diffDs[uVar].data[diffTSteps, :, :].mean(axis=0))
-            vData = (ds[vVar].data[tSteps, :, :].mean(axis=0) -
-                     diffDs[vVar].data[diffTSteps, :, :].mean(axis=0))
+    if np.ndim(ds[plotVar]) == 3:
+        if diff_flag:
+            pData = (ds[plotVar].values[tSteps, :, :].mean(axis=0) -
+                     diffDs[diffVar].values[diffTSteps, :, :].mean(axis=0))
+            if quiver_flag:
+                uData = (ds[uVar].data[tSteps, :, :].mean(axis=0) -
+                         diffDs[uVar].data[diffTSteps, :, :].mean(axis=0))
+                vData = (ds[vVar].data[tSteps, :, :].mean(axis=0) -
+                         diffDs[vVar].data[diffTSteps, :, :].mean(axis=0))
+            else:
+                uData = None
+                vData = None
         else:
-            uData = None
-            vData = None
-    else:
-        pData = ds[plotVar].values[tSteps, :, :].mean(axis=0)
-        if quiver_flag:
-            uData = ds[uVar].data[tSteps, :, :].mean(axis=0)
-            vData = ds[vVar].data[tSteps, :, :].mean(axis=0)
+            pData = ds[plotVar].values[tSteps, :, :].mean(axis=0)
+            if quiver_flag:
+                uData = ds[uVar].data[tSteps, :, :].mean(axis=0)
+                vData = ds[vVar].data[tSteps, :, :].mean(axis=0)
+            else:
+                uData = None
+                vData = None
+    elif np.ndim(ds[plotVar]) == 4:
+        jPlev = int(np.arange(len(ds.plev)
+                              )[ds.plev.values == plev])
+        if diff_flag:
+            kPlev = int(np.arange(len(diffDs.plev)
+                                  )[diffDs.plev.values == diffPlev])
+            pData = (
+                ds[plotVar].values[tSteps, jPlev, :, :].mean(axis=0) -
+                diffDs[diffVar].values[diffTSteps, kPlev, :, :].mean(axis=0))
+            if quiver_flag:
+                uData = (
+                    ds[uVar].data[tSteps, jPlev, :, :].mean(axis=0) -
+                    diffDs[uVar].data[diffTSteps, kPlev, :, :].mean(axis=0))
+                vData = (
+                    ds[vVar].data[tSteps, jPlev, :, :].mean(axis=0) -
+                    diffDs[vVar].data[diffTSteps, kPlev, :, :].mean(axis=0))
+            else:
+                uData = None
+                vData = None
         else:
-            uData = None
-            vData = None
+            pData = ds[plotVar].values[tSteps, jPlev, :, :].mean(axis=0)
+            if quiver_flag:
+                uData = ds[uVar].data[tSteps, jPlev, :, :].mean(axis=0)
+                vData = ds[vVar].data[tSteps, jPlev, :, :].mean(axis=0)
+            else:
+                uData = None
+                vData = None
 
     # Compute and subtract off regional mean if requested
     if rmRegMean_flag:
+        if verbose_flag:
+            print('Removing regional mean over ' +
+                  'lat={:0d},{:0d} and '.format(rmRegLatLim[0],
+                                                rmRegLatLim[-1]) +
+                  'lon={:0d},{:0d}'.format(rmRegLonLim[0],
+                                           rmRegLonLim[-1]))
         # Get averaging lat/lon limits if not explicity provided
         if rmRegLatLim is None:
             rmRegLatLim = latLim
@@ -505,12 +550,45 @@ def plotlatlon(ds,
                                        qc_flag=qc_flag,
                                        stdUnits_flag=False,
                                        )
-
+        # print(regMeanDs.values)
         # Compute time mean regional mean to be subtracted
         regMean = regMeanDs.values[tSteps].mean(axis=0)
 
         # Subtract off regional mean
-        pData = pData - regMean
+        try:
+            pData = pData - regMean
+        except ValueError:
+            jPlev = int(np.arange(len(ds.plev))[ds.plev.values == plev])
+            regMean = regMean[jPlev]
+            pData = pData - regMean
+
+        if diff_flag:
+            # Compute regional mean for subtracting off (differenced values)
+            dregMeanDs = mwfn.calcdaregmean(diffDs[diffVar],
+                                            gwDa=(diffDs['gw']
+                                                  if 'gw' in diffDs
+                                                  else None),
+                                            latLim=rmRegLatLim,
+                                            lonLim=rmRegLonLim,
+                                            ocnOnly_flag=ocnOnly_flag,
+                                            landFracDa=(diffDs['LANDFRAC']
+                                                        if 'LANDFRAC' in diffDs
+                                                        else None),
+                                            qc_flag=qc_flag,
+                                            stdUnits_flag=False,
+                                            )
+            dregMean = dregMeanDs.values[tSteps].mean(axis=0)
+
+            # "Subtract off" regional mean from differenced values
+            #    a' - b' = (a - a_bar) - (b - b_bar) = a - a_bar - b + b_bar
+            try:
+                pData = pData + dregMean
+            except ValueError:
+                kPlev = int(np.arange(len(diffDs.plev)
+                                      )[diffDs.plev.values == diffPlev])
+                dregMean = dregMean[kPlev]
+                pData = pData + dregMean
+
         if qc_flag:
             print(regMean)
 
@@ -520,6 +598,16 @@ def plotlatlon(ds,
     # if plotting difference, extend both ends for all variables
     if diff_flag:
         maxExtendVars = []
+
+    # Set variable name for labeling colorbar
+    varName = mwp.getplotvarstring(ds[plotVar].name)
+    if np.ndim(ds[plotVar]) == 4:
+        # Add level if original field is 4d
+        varName = varName + str(plev)
+    if all([diff_flag, plev != diffPlev]):
+        # Add differencing of levels if plotting differences and
+        #   plev and diffPlev are not the same (for plotting shears)
+        varName = varName + '-' + str(diffPlev)
 
     # Plot map
     im1, ax = mwp.plotmap(ds.lon,
@@ -542,7 +630,7 @@ def plotlatlon(ds,
                           levels=levels,
                           lonlbls=lonlbls,
                           lonLim=lonLim,
-                          varName=mwp.getplotvarstring(ds[plotVar].name),
+                          varName=varName,
                           varUnits=ds[plotVar].units,
                           quiver_flag=quiver_flag,
                           quiverScale=quiverScale,
@@ -565,8 +653,14 @@ def plotlatlon(ds,
 
     # Add removed regional mean to annotations
     if rmRegMean_flag:
-        rmMeanString = '\nRm Reg Mean = {:0.1f} {:s}'.format(regMean,
-                                                             ds[plotVar].units)
+        if diff_flag:
+            rmMeanString = (
+                '\nRm Reg Mean = {:0.1f} {:s}'.format(regMean - dregMean,
+                                                      ds[plotVar].units))
+        else:
+            rmMeanString = (
+                '\nRm Reg Mean = {:0.1f} {:s}'.format(regMean,
+                                                      ds[plotVar].units))
     else:
         rmMeanString = ''
 
@@ -604,17 +698,19 @@ def plotmultilatlon(dsDict,
                     diff_flag=False,
                     diffIdList=None,
                     diffDs=None,
+                    diffPlev=None,
                     diffVar=None,
                     fontSize=12,
                     latLim=np.array([-30, 30]),
                     latlbls=None,
                     lonLim=np.array([119.5, 270.5]),
                     lonlbls=None,
+                    plev=None,
                     quiver_flag=False,
                     quiverScale=0.4,
                     quiverUnits='inches',
                     rmse_flag=False,
-                    rmRegMean_flag=False,
+                    # rmRegMean_flag=False,
                     save_flag=False,
                     saveDir=None,
                     stampDate_flag=False,
@@ -735,17 +831,23 @@ def plotmultilatlon(dsDict,
                 compcont_flag=compcont_flag,
                 diff_flag=True,
                 diffDs=(dsDict[diffIdList[jSet]]
-                        if diffDs is None
+                        if any([diffDs is None,
+                                diffDs == dsDict])
                         else diffDs),
+                diffPlev=diffPlev,
                 diffVar=diffVar,
                 fontSize=fontSize,
                 latLim=latLim,
                 latlbls=latlbls,
                 lonLim=lonLim,
                 lonlbls=lonlbls,
+                plev=plev,
                 quiver_flag=quiver_flag,
                 quiverScale=quiverScale,
                 quiverUnits=quiverUnits,
+                # rmRegLatLim=rmRegLatLim,
+                # rmRegLonLim=rmRegLonLim,
+                # rmRegMean_flag=rmRegMean_flag,
                 rmse_flag=rmse_flag,
                 stampDate_flag=stampDate_flag,
                 tSteps=tSteps,
@@ -759,15 +861,17 @@ def plotmultilatlon(dsDict,
                 box_flag=box_flag[jSet],
                 cbar_flag=False,
                 compcont_flag=compcont_flag,
+                diff_flag=False,
                 fontSize=fontSize,
                 latLim=latLim,
                 latlbls=latlbls,
                 lonLim=lonLim,
                 lonlbls=lonlbls,
+                plev=plev,
                 quiver_flag=quiver_flag,
                 quiverScale=quiverScale,
                 quiverUnits=quiverUnits,
-                rmRegMean_flag=rmRegMean_flag,
+                # rmRegMean_flag=rmRegMean_flag,
                 stampDate_flag=stampDate_flag,
                 tSteps=tSteps,
                 tStepLabel_flag=(jSet == 0),
@@ -804,6 +908,17 @@ def plotmultilatlon(dsDict,
                                orientation=cbarOrientation,
                                )
         pcb = cbar_ax.get_position()
+
+        # Get variable name for colorbar label
+        varName = mwp.getplotvarstring(dsDict[plotIdList[0]][plotVar].name)
+        if np.ndim(dsDict[plotIdList[0]][plotVar]) == 4:
+            # Add level if original field is 4d
+            varName = varName + str(plev)
+        if all([diff_flag, plev != diffPlev]):
+            # Add differencing of levels if plotting differences and
+            #   plev and diffPlev are not the same (for plotting shears)
+            varName = varName + '-' + str(diffPlev)
+
         # Create colorbar
         if cbarOrientation == 'vertical':
             # Place colorbar on figure
@@ -813,8 +928,7 @@ def plotmultilatlon(dsDict,
             # Label colorbar with variable name and units
             cbar_ax.set_ylabel(
                 (r'$\Delta$' if diff_flag else '') +
-                mwp.getplotvarstring(dsDict[plotIdList[0]][plotVar].name) +
-                ' (' +
+                varName + ' (' +
                 mwfn.getstandardunitstring(
                     dsDict[plotIdList[0]][plotVar].units) +
                 ')')
@@ -827,7 +941,7 @@ def plotmultilatlon(dsDict,
             # Label colorbar with variable name and units
             cbar_ax.set_xlabel(
                 (r'$\Delta$' if diff_flag else '') +
-                mwp.getplotvarstring(dsDict[plotIdList[0]][plotVar].name) + ' (' +
+                varName + ' (' +
                 mwfn.getstandardunit(dsDict[plotIdList[0]][plotVar].units) +
                 ')')
 
@@ -837,7 +951,8 @@ def plotmultilatlon(dsDict,
         else:
             try:
                 hcb.set_ticks(im1.levels[::2]
-                              if np.min(np.abs(im1.levels[::2] - compcont)) < 1e-10
+                              if np.min(np.abs(im1.levels[::2] - compcont)
+                                        ) < 1e-10
                               else im1.levels[1::2])
             except TypeError:
                 pass
@@ -876,10 +991,18 @@ def plotmultilatlon(dsDict,
                 diffStr = 'd' + diffIdList[0][plotVar].srcid + '_'
             else:
                 diffStr = ''
-
-            saveFile = (plotVar +
+            # Get variable name for saving
+            varName = plotVar
+            if np.ndim(dsDict[plotIdList[0]][plotVar]) == 4:
+                # Add level if original field is 4d
+                varName = varName + str(plev)
+            if plev != diffPlev:
+                # Add differencing of levels if plotting differences and
+                #   plev and diffPlev are not the same (for plotting shears)
+                varName = varName + '-' + str(diffPlev)
+            saveFile = (varName +
                         '_latlon_comp{:d}_'.format(len(plotIdList)) +
-                        diffStr + '_' +
+                        diffStr +
                         tString +
                         '{:03.0f}'.format(tSteps[0]) + '-' +
                         '{:03.0f}'.format(tSteps[-1]))

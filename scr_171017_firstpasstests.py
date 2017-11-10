@@ -19,10 +19,14 @@ import matplotlib.pyplot as plt  # for plotting things
 from socket import gethostname   # used to determine which machine we are
 #                                #   running on
 
+import multiprocessing as mp  # Allow use of multiple cores
+import datetime  # For keeping track of run times
+
 from mdwtools import mdwfunctions as mwfn  # For averaging things
 from mdwtools import mdwplots as mwp  # For plotting things
 
 import cesm1to2plotter as c1to2p
+
 # import matplotlib.cm as cm
 from scipy.stats import linregress
 
@@ -93,13 +97,14 @@ if __name__ == '__main__':
     loadHadIsst_flag = True
     obs_flag = True
     ocnOnly_flag = True  # Need to implement to confirm CTindex is right.
-    plotBiasRelation_flag = True
+    plotBiasRelation_flag = False
     plotOneMap_flag = False
-    plotMultiMap_flag = False
+    plotMultiMap_flag = True
     plotGpcpTest_flag = False
     plotRegMean_flag = False
     plotZonRegMeanHov_flag = False
     prect_flag = True
+    regridVertical_flag = True
     reload_flag = False
     save_flag = False
     saveSubDir = 'testfigs/'
@@ -113,7 +118,7 @@ if __name__ == '__main__':
 
     # Set name(s) of file(s) to load
     versionIds = ['01',
-                  '28', '36',
+                  '28',  '36',
                   'ga7.66', '119', '125',
                   '161', '194', '195'
                   ]
@@ -219,6 +224,92 @@ if __name__ == '__main__':
 #                                 newUnits[plotVar]
 #                                 )
 
+# %% Regrid 3D fields
+
+    vid = '01'
+
+    if False:
+        """
+        DEPRECATED
+        """
+        startTime = datetime.datetime.now()
+        # Set levels for regridding
+        newLevs = np.array([800, 900])
+
+        # Set variable to regrid
+        regridVar = 'U'
+
+        # Regrid dataarray
+        # Benchmark for timing
+        newDas = dict()
+        for vid in versionIds:
+            print('---Processing {:s}---'.format(vid))
+            newDas[vid] = mwfn.regriddssigmatopres(dataSets[vid],
+                                                   regridVar,
+                                                   newLevs,
+                                                   modelId='cesm',
+                                                   verbose_flag=True)
+
+        print('\n##------------------------------##')
+        print('Time to regrid with loop:')
+        print(datetime.datetime.now() - startTime)
+        print('##------------------------------##\n')
+
+# %%
+
+    if all([regridVertical_flag,
+            any([reload_flag, load_flag])]):
+        print('>> Regridding vertical levels <<')
+        startTime = datetime.datetime.now()
+        # Set new levels for regridding
+        #   > Timing works out to about 30s per level (seems long...)
+        newLevs = np.array([200, 850])
+        regridVar = 'U'
+
+        # Regrid 3D variables using multiprocessing
+        mpPool = mp.Pool(8)
+
+        # Get list of cases for unpacking later
+        versionIds = versionIds
+
+        # Load all datasets to memory to enable multiprocessing
+        for vid in versionIds:
+            dataSets[vid][regridVar].load()
+            dataSets[vid]['PS'].load()
+            dataSets[vid]['hyam'].load()
+            dataSets[vid]['hybm'].load()
+
+        # Create input tuple for regridding to pressure levels
+        mpInList = [(dataSets[vid],
+                     regridVar,
+                     newLevs,
+                     'cesm')
+                    for vid in versionIds]
+
+        # Call multiprocessing of regridding
+        # regriddedVars = mpPool.map(mwfn.regriddssigmatopres_mp,
+        #                            mpInList)
+        regriddedVars = mpPool.map_async(mwfn.regriddssigmatopres_mp,
+                                         mpInList)
+
+        # Close multiprocessing pool
+        regriddedVars = regriddedVars.get()
+        mpPool.close()
+        mpPool.terminate()  # Not proper, but may be needed to work properly
+        mpPool.join()
+
+        print('\n##------------------------------##')
+        print('Time to regrid with mp:')
+        print(datetime.datetime.now() - startTime)
+        print('##------------------------------##\n')
+
+        # Unpack regriddedVars
+        dataSets_rg = dict()
+        for jVid, vid in enumerate(versionIds):
+            dataSets_rg[vid] = regriddedVars[jVid].to_dataset(name=regridVar)
+            dataSets_rg[vid].attrs['id'] = regriddedVars[jVid].id
+
+
 # %% Plot one map
     # set plotting parameters
     latLim = np.array([-30, 30])
@@ -230,26 +321,29 @@ if __name__ == '__main__':
     tSteps = np.arange(0, 12)
 
     if plotOneMap_flag:
-        plotVar = 'sp'
+        plotVar = 'U'
 
         # Create figure for plotting
         hf = plt.figure()
 
         # Plot some fields for comparison
-        c1to2p.plotlatlon(eraiDs,
+        c1to2p.plotlatlon(dataSets_rg['01'],
                           plotVar,
                           box_flag=False,
                           caseString=None,
                           cbar_flag=True,
-                          cbar_dy=0.001,
+                          # cbar_dy=0.001,
                           cbar_height=0.02,
+                          cMap='RdBu_r',
                           compcont_flag=True,
-                          diff_flag=False,
-                          diffDs=hadIsstDs,  # gpcpClimoDs,
+                          diff_flag=True,
+                          diffDs=dataSets_rg['01'],  # gpcpClimoDs,
+                          diffPlev=200,
                           fontSize=12,
                           latLim=np.array([-20, 20]),
-                          levels=np.arange(-5, 5.1, 1),
+                          levels=np.arange(-15, 15.1, 1.5),
                           lonLim=np.array([119.5, 270.5]),
+                          plev=850,
                           quiver_flag=False,
                           rmRegMean_flag=True,
                           stampDate_flag=False,
@@ -319,32 +413,34 @@ if __name__ == '__main__':
 
 # %% Plot multiple maps
     if plotMultiMap_flag:
-        plotVars = ['PS']
+        plotVars = ['U']
         for plotVar in plotVars:
-            c1to2p.plotmultilatlon(dataSets,
+            c1to2p.plotmultilatlon(dataSets_rg,
                                    versionIds,
                                    plotVar,
                                    box_flag=False,
                                    cbar_flag=True,
                                    cbarOrientation='vertical',
                                    compcont_flag=True,
-                                   diff_flag=diff_flag,
-                                   diffIdList=None,  # ['01']*9,
-                                   diffDs=hadIsstDs,
-                                   diffVar='sst',
+                                   diff_flag=True,
+                                   diffIdList=versionIds,
+                                   diffDs=dataSets_rg,
+                                   diffPlev=200,
+                                   diffVar='U',
                                    fontSize=24,
                                    latLim=np.array([-20.1, 20.1]),
                                    latlbls=None,
-                                   levels=np.arange(-5, 5.1, 1),
+                                   levels=np.arange(-20, 20.1, 2),
                                    lonLim=np.array([119.5, 270.5]),
                                    lonlbls=None,
-                                   ocnOnly_flag=True,
+                                   ocnOnly_flag=False,
+                                   plev=850,
                                    quiver_flag=False,
                                    quiverScale=0.4,
                                    quiverUnits='inches',
                                    rmRegLatLim=np.array([-20, 20]),
                                    rmRegLonLim=np.array([119.5, 270.5]),
-                                   rmRegMean_flag=True,
+                                   rmRegMean_flag=False,
                                    rmse_flag=False,
                                    save_flag=save_flag,
                                    saveDir=setfilepaths()[2] + saveSubDir,

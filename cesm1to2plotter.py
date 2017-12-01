@@ -21,9 +21,9 @@ except:
 import matplotlib.pyplot as plt  # import matplotlib for plotting
 import matplotlib.gridspec as gridspec  # pretty subplots
 
-import mdwtools.mdwfunctions as mwfn      # import personal processing functions
-import mdwtools.mdwplots as mwp           # import personal plotting functions
-import netCDF4 as nc4            # import netCDF4 as nc4
+import mdwtools.mdwfunctions as mwfn  # import personal processing functions
+import mdwtools.mdwplots as mwp       # import personal plotting functions
+# import netCDF4 as nc4            # import netCDF4 as nc4
 import numpy as np               # import numpy as np
 from socket import gethostname   # used to determine which machine we are
 #                                #   running on
@@ -51,13 +51,28 @@ def calcregmeanindex(ds,
                      ):
     """
     Compute regional mean indices
+    - CPacShear - central Pacific wind shear (850-200)
     - CTI - cold tongue index
     - dITCZ - double-ITCZ index
+    - dSLP - Eq. Pacific SLP gradient (~Walker strength)
     - walker - Walker circulation index (based on pressure)
     """
 
     # Choose appropriate index to compute
-    if indexName.lower() in ['cti']:
+    if indexName.lower() in ['cpacshear']:
+        # Assign default index if none provided
+        if indexType is None:
+            indexType = 'testing'
+        if indexVar is None:
+            indexVar = 'U'
+
+        # Compute central Pacific shear index
+        indexDa = mwfn.calcdscpacshear(ds,
+                                       indexType=indexType,
+                                       indexVar=indexVar,
+                                       )
+
+    elif indexName.lower() in ['cti']:
         # Assign default index if none provided
         if indexType is None:
             indexType = 'Woelfleetal2017'
@@ -83,12 +98,15 @@ def calcregmeanindex(ds,
                                         precipVar=indexVar,
                                         )
 
-    elif indexName.lower() in ['walker']:
+    elif indexName.lower() in ['walker', 'dslp']:
         # Assign default index if none provided
         if indexType is None:
-            indexType = 'testing'
+            indexType = 'DiNezioetal2013'
         if indexVar is None:
-            indexVar = 'PS'
+            if indexType == 'DiNezioetal2013':
+                indexVar = 'PSL'
+            else:
+                indexVar = 'PS'
 
         # Compute Walker circulation index
         indexDa = mwfn.calcdswalkerindex(ds,
@@ -96,6 +114,9 @@ def calcregmeanindex(ds,
                                          ocnOnly_flag=ocnOnly_flag,
                                          pressureVar=indexVar,
                                          )
+    else:
+        raise NameError('Cannot find function to compute ' +
+                        'index: {:s}'.format(indexName))
 
     # Return index data array
     return indexDa
@@ -186,6 +207,19 @@ def getcompcont(plotVar,
         compcont = np.array([0])
 
     return compcont
+
+
+def getcolordict():
+    return {'01': '#1f77b4',
+            '119': '#9467bd',
+            '125': '#8c564b',
+            '161': '#e377c2',
+            '194': '#7f7f7f',
+            '195': '#bcbd22',
+            '28': '#ff7f0e',
+            '36': '#2ca02c',
+            'ga7.66': '#d62728',
+            'obs': [0, 0, 0]}
 
 
 def getmapcontlevels(plotVar,
@@ -361,9 +395,232 @@ def getyearsubdirs(versionId):
                 for yid in yrIds]
 
 
+def plotbiasrelation(ds,
+                     xIndex,
+                     yIndex,
+                     ds_rg=None,  # For vertically regridded when needed
+                     legend_flag=True,
+                     makeFigure_flag=False,
+                     obsDsDict=None,
+                     plotObs_flag=True,
+                     splitTSteps_flag=False,
+                     tSteps=None,
+                     tStepString=None,
+                     versionIds=None,
+                     xIndexType=None,
+                     yIndexType=None,
+                     xLim=None,
+                     yLim=None,
+                     xTSteps=None,
+                     yTSteps=None,
+                     ):
+    """
+    Plot scatterplot of one bias metric versus another averaged over a given
+        time period
+    """
+    # Set version Ids to be plotted
+    if versionIds is None:
+        versionIds = list(ds.keys())
+
+    # Months to include
+    #   DJF - 0, 1, 11; MAM - 2, 3, 4; JJA - 5, 6, 7; SON - 8, 9, 10
+    if tSteps is None:
+        if tStepString is not None:
+            try:
+                tSteps = {'DJF': np.array([11, 0, 1]),
+                          'MAM': np.array([2, 3, 4]),
+                          'JJA': np.array([5, 6, 7]),
+                          'SON': np.array([8, 9, 10]),
+                          'Annual': np.arange(12)
+                          }[tStepString]
+            except KeyError:
+                tSteps = np.arange(12)
+        else:
+            tSteps = np.arange(12)
+
+    # Assign time steps for each index
+    if not splitTSteps_flag:
+        xTSteps = tSteps
+        yTSteps = tSteps
+
+    xMean = dict()
+    yMean = dict()
+
+    # Set index details
+    xDs = (ds_rg if xIndex.lower() in ['cpacshear'] else ds)
+    yDs = (ds_rg if yIndex.lower() in ['cpacshear'] else ds)
+    indexTypes = {'cpacshear': 'testing',
+                  'cti': 'Woelfleetal2017',
+                  'ditcz': 'Bellucci2010',
+                  'dslp': 'DiNezioetal2013',
+                  'walker': 'testing'}
+    if xIndexType is None:
+        xIndexType = indexTypes[xIndex.lower()]
+    if yIndexType is None:
+        yIndexType = indexTypes[yIndex.lower()]
+    indexVars = {'cpacshear': 'U',
+                 'cti': 'TS',
+                 'ditcz': 'PRECT',
+                 'dslp': 'PSL',
+                 'walker': 'PS'}
+    labelDict = {'cpacshear': 'Central Pacific Wind Shear' +
+                              ' (850-200 hPa; {:s})'.format(
+                                  ds[versionIds[0]]['U'].units),
+                 'cti': 'Cold Tongue Index (K)',
+                 'ditcz': 'Double-ITCZ Index (mm/d)',
+                 'dslp': 'SLP Gradient (hPa)',
+                 'walker': 'Walker Circulation Index (hPa)'}
+    if plotObs_flag:
+        #        obsDsDict = {'cpacshear': obsDsDict['cpacshear'],
+        #                   'cti': obsDsDict['cti'],
+        #                   'ditcz': obsDsDict['ditcz'],
+        #                   'walker': obsDsDict['walker']}
+        obsVars = {'cpacshear': 'u',
+                   'cti': 'sst',
+                   'ditcz': 'precip',
+                   'dslp': 'msl',
+                   'walker': 'sp'}
+
+    # Compute indices for various model versions
+    for vid in versionIds:
+
+        # Compute first index
+        xIndexDa = calcregmeanindex(
+            xDs[vid],
+            xIndex,
+            indexType=xIndexType,
+            indexVar=indexVars[xIndex.lower()],
+            ocnOnly_flag=False)
+        xMean[vid] = xIndexDa[xTSteps].mean(dim='time')
+
+        # Compute second index
+        yIndexDa = calcregmeanindex(
+            yDs[vid],
+            yIndex,
+            indexType=yIndexType,
+            indexVar=indexVars[yIndex.lower()],
+            ocnOnly_flag=False)
+        yMean[vid] = yIndexDa[yTSteps].mean(dim='time')
+
+    # Compute indices for observations
+    #   (reference only; not in correlation)
+    if plotObs_flag:
+        # First index
+        xObsDa = calcregmeanindex(
+            obsDsDict[xIndex.lower()],
+            xIndex,
+            indexType=indexTypes[xIndex.lower()],
+            indexVar=obsVars[xIndex.lower()],
+            ocnOnly_flag=False)
+        xMean['obs'] = xObsDa[xTSteps].mean(dim='time')
+        # print(xMean['obs'].values)
+
+        # Second index
+        yObsDa = calcregmeanindex(
+            obsDsDict[yIndex.lower()],
+            yIndex,
+            indexType=indexTypes[yIndex.lower()],
+            indexVar=obsVars[yIndex.lower()],
+            ocnOnly_flag=False)
+        yMean['obs'] = yObsDa[yTSteps].mean(dim='time')
+        # print(yMean['obs'].values)
+
+    # Plot versus one another as scatter plot
+    if makeFigure_flag:
+        plt.figure()
+
+    # Plot line to show version path through scatterplot
+    plt.plot(np.array([xMean[vid] for vid in versionIds]),
+             np.array([yMean[vid] for vid in versionIds]),
+             c='k',
+             label=None,
+             zorder=1)
+
+    for vid in versionIds:
+        plt.scatter(xMean[vid],
+                    yMean[vid],
+                    marker='o',
+                    s=80,
+                    c=getcolordict()[vid],
+                    label=vid,
+                    zorder=2
+                    )
+    if plotObs_flag:
+        plt.scatter(xMean['obs'],
+                    yMean['obs'],
+                    marker='^',
+                    s=80,
+                    c=getcolordict()['obs'],
+                    label='Obs')
+
+    # Compute correlation between cold tongue index and double-ITCZ index
+    #   across model versions
+    r = np.corrcoef(np.array([xMean[vid]
+                              for vid in versionIds]),
+                    np.array([yMean[vid]
+                              for vid in versionIds]))[0, 1]
+
+    # Add correlation to plot as annotation
+    plt.gca().annotate(r'$\mathregular{r^2}$' + '={:0.3f}'.format(r),
+                       xy=(1, 1),
+                       xycoords='axes fraction',
+                       horizontalalignment='right',
+                       verticalalignment='bottom',
+                       )
+
+    # Determine string for labeling averaging time
+    if splitTSteps_flag:
+        tStepString = 'Split time Steps: x-XXX, y-XXX'
+    else:
+        if all([j in tSteps for j in np.arange(12)]):
+            tStepString = 'Annual mean'
+        else:
+            monIds = ['J', 'F', 'M', 'A', 'M', 'J',
+                      'J', 'A', 'S', 'O', 'N', 'D']
+            try:
+                tStepString = ''.join([monIds[tStep] for tStep in tSteps])
+                # Correct JFD to DJF if necessary
+                if tStepString == 'JFD':
+                    tStepString = 'DJF'
+                tStepString = tStepString + ' mean'
+            except NameError:
+                tStepString = '[Error]'
+
+    # Add averaging time to plot as annotation
+    if tStepString:
+        plt.gca().annotate(tStepString,
+                           xy=(0, 1),
+                           xycoords='axes fraction',
+                           horizontalalignment='left',
+                           verticalalignment='bottom',
+                           )
+
+    # Label axes
+    plt.xlabel(labelDict[xIndex.lower()])
+    plt.ylabel(labelDict[yIndex.lower()])
+
+    # Set axes limits
+    if xLim is not None:
+        plt.xlim(xLim)
+    if yLim is not None:
+        plt.ylim(yLim)
+
+    # Add legend (if requested)
+    if legend_flag:
+        if len(versionIds) > 5:
+            plt.legend(ncol=2)
+        else:
+            plt.legend()
+
+    # Don't return anything for now.
+    return
+
+
 def plotlatlon(ds,
                plotVar,
                box_flag=False,
+               boxLat=np.array([-20, 20]),
+               boxLon=np.array([210, 260]),
                caseString=None,
                cbar_flag=True,
                cbar_dy=-0.1,
@@ -614,6 +871,8 @@ def plotlatlon(ds,
                           ds.lat,
                           pData,
                           box_flag=box_flag,
+                          boxLat=boxLat,
+                          boxLon=boxLon,
                           caseString=caseString,
                           cbar_flag=cbar_flag,
                           cbar_dy=cbar_dy,
@@ -758,7 +1017,8 @@ def plotmultilatlon(dsDict,
             # Set up subplots
             gs = gridspec.GridSpec(5, 2,
                                    height_ratios=[20, 1, 20, 1, 20],
-                                   width_ratios=[30, 1])
+                                   width_ratios=[30, 1],
+                                   )
 
             # Set gridspec colorbar location
             cbColInd = 1
@@ -783,14 +1043,22 @@ def plotmultilatlon(dsDict,
     elif len(plotIdList) == 9:
         if cbarOrientation == 'vertical':
             # Set figure window size
-            hf.set_size_inches(16.25, 7.75, forward=True)
+            if np.diff(latLim) >= 50:
+                hf.set_size_inches(16.25, 6.75, forward=True)
+            else:
+                hf.set_size_inches(16.25, 5.75, forward=True)
 
             # Set up subplots
             gs = gridspec.GridSpec(3, 4,
                                    height_ratios=[1, 1, 1],
-                                   hspace=0.05,
+                                   hspace=0.00,
                                    width_ratios=[30, 30, 30, 1],
-                                   wspace=0.15)
+                                   wspace=0.2,
+                                   left=0.04,
+                                   right=0.96,
+                                   bottom=0.00,
+                                   top=1.0,
+                                   )
 
             # Set gridspec colorbar location
             cbColInd = 3
@@ -804,7 +1072,8 @@ def plotmultilatlon(dsDict,
                                    height_ratios=[20, 20, 20, 1],
                                    hspace=0.5,
                                    width_ratios=[1, 1, 1],
-                                   wspace=0.5)
+                                   wspace=0.5,
+                                   )
 
             # Set gridspec colorbar location
             cbColInd = 0
@@ -829,7 +1098,7 @@ def plotmultilatlon(dsDict,
                 box_flag=box_flag[jSet],
                 cbar_flag=False,
                 compcont_flag=compcont_flag,
-                diff_flag=True,
+                diff_flag=diff_flag,
                 diffDs=(dsDict[diffIdList[jSet]]
                         if any([diffDs is None,
                                 diffDs == dsDict])
@@ -881,7 +1150,7 @@ def plotmultilatlon(dsDict,
         # Add subplot label (subfigure number)
         ax.annotate('(' + chr(jSet + ord(subFigCountStart)) + ')',
                     # xy=(-0.12, 1.09),
-                    xy=(-0.08, 1.05),
+                    xy=(-0.08, 1.07),
                     xycoords='axes fraction',
                     horizontalalignment='left',
                     verticalalignment='bottom',
@@ -975,6 +1244,9 @@ def plotmultilatlon(dsDict,
                                    linewidth=2)
             except TypeError:
                 pass
+
+    # Expand plot(s) to fill figure window
+    # gs.tight_layout(hf)
 
     # Save figure if requested
     if save_flag:

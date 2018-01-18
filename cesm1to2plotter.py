@@ -257,7 +257,9 @@ def getmapcontlevels(plotVar,
                       'TAUX': np.arange(-0.1, 0.101, 0.01),
                       'TAUY': np.arange(-0.1, 0.101, 0.01),
                       'TS': np.arange(-2, 2.1, 0.2),
-                      'U': np.arange(-15, 15.1, 1.5),
+                      'U': np.arange(-5, 5.1, 0.5),
+                      'V': np.arange(-2, 2.1, 0.2),
+                      'U10': np.arange(-2, 2.1, 0.2),
                       'curlTau': np.arange(-1.5e-7, 1.51e-7, 1.5e-8),
                       'curlTau_y': np.arange(-4e-13, 4.01e-13, 4e-14),
                       'divTau': np.arange(-1e-7, 1.01e-7, 1e-8),
@@ -288,6 +290,7 @@ def getmapcontlevels(plotVar,
                       'TAUY': np.arange(-0.1, 0.101, 0.01),
                       'TS': np.arange(290, 305, 1),
                       'U': np.arange(-10, 10.1, 1.0),
+                      'U10': np.arange(0, 10.1, 1),
                       'curlTau': np.arange(-3e-7, 3.001e-7, 3e-8),
                       'curlTau_y': np.arange(-4e-13, 4.01e-13, 4e-14),
                       'divTau': np.arange(-2e-7, 2.01e-7, 2e-8),
@@ -645,15 +648,21 @@ def plotlatlon(ds,
                plev=None,
                qc_flag=False,
                quiver_flag=False,
+               quiverDs=None,
+               quiverDiffDs=None,
+               quiverNorm_flag=False,
                quiverScale=0.4,
+               quiverScaleVar=None,
                quiverUnits='inches',
                rmRegLatLim=None,
                rmRegLonLim=None,
                rmRegMean_flag=False,
                rmse_flag=False,
                stampDate_flag=True,
+               subSamp=None,
                tSteps=None,
                tStepLabel_flag=True,
+               uRef=0.1,
                uVar='TAUX',
                vVar='TAUY',
                verbose_flag=False,
@@ -712,6 +721,12 @@ def plotlatlon(ds,
     if diffVar is None:
         diffVar = plotVar
 
+    # Define quiver datasets if needed
+    if quiverDs is None:
+        quiverDs = ds
+    if quiverDiffDs is None:
+        quiverDiffDs = diffDs
+
     # Convert units as needed
     (ds[plotVar].values,
      ds[plotVar].attrs['units']) = mwfn.convertunit(
@@ -730,27 +745,13 @@ def plotlatlon(ds,
         except TypeError:
             pass
 
-    # Pull data for plotting
+    # Pull data for plotting contours
     if np.ndim(ds[plotVar]) == 3:
         if diff_flag:
             pData = (ds[plotVar].values[tSteps, :, :].mean(axis=0) -
                      diffDs[diffVar].values[diffTSteps, :, :].mean(axis=0))
-            if quiver_flag:
-                uData = (ds[uVar].data[tSteps, :, :].mean(axis=0) -
-                         diffDs[uVar].data[diffTSteps, :, :].mean(axis=0))
-                vData = (ds[vVar].data[tSteps, :, :].mean(axis=0) -
-                         diffDs[vVar].data[diffTSteps, :, :].mean(axis=0))
-            else:
-                uData = None
-                vData = None
         else:
             pData = ds[plotVar].values[tSteps, :, :].mean(axis=0)
-            if quiver_flag:
-                uData = ds[uVar].data[tSteps, :, :].mean(axis=0)
-                vData = ds[vVar].data[tSteps, :, :].mean(axis=0)
-            else:
-                uData = None
-                vData = None
     elif np.ndim(ds[plotVar]) == 4:
         jPlev = int(np.arange(len(ds.plev)
                               )[ds.plev.values == plev])
@@ -760,24 +761,73 @@ def plotlatlon(ds,
             pData = (
                 ds[plotVar].values[tSteps, jPlev, :, :].mean(axis=0) -
                 diffDs[diffVar].values[diffTSteps, kPlev, :, :].mean(axis=0))
-            if quiver_flag:
-                uData = (
-                    ds[uVar].data[tSteps, jPlev, :, :].mean(axis=0) -
-                    diffDs[uVar].data[diffTSteps, kPlev, :, :].mean(axis=0))
-                vData = (
-                    ds[vVar].data[tSteps, jPlev, :, :].mean(axis=0) -
-                    diffDs[vVar].data[diffTSteps, kPlev, :, :].mean(axis=0))
-            else:
-                uData = None
-                vData = None
         else:
             pData = ds[plotVar].values[tSteps, jPlev, :, :].mean(axis=0)
-            if quiver_flag:
-                uData = ds[uVar].data[tSteps, jPlev, :, :].mean(axis=0)
-                vData = ds[vVar].data[tSteps, jPlev, :, :].mean(axis=0)
+
+    # Pull data for plotting vectors (if needed)
+    if quiver_flag:
+        if np.ndim(quiverDs[uVar]) == 3:
+            if diff_flag:
+                uData = (
+                    quiverDs[uVar].data[tSteps, :, :].mean(axis=0) -
+                    quiverDiffDs[uVar].data[diffTSteps, :, :].mean(axis=0))
+                vData = (
+                    quiverDs[vVar].data[tSteps, :, :].mean(axis=0) -
+                    quiverDiffDs[vVar].data[diffTSteps, :, :].mean(axis=0))
+                if quiverScaleVar is not None:
+                    quivSc = (
+                        quiverDs[quiverScaleVar].values[tSteps, :, :
+                                                        ].mean(axis=0) -
+                        quiverDiffDs[quiverScaleVar].values[diffTSteps, :, :
+                                                            ].mean(axis=0))
             else:
-                uData = None
-                vData = None
+                uData = quiverDs[uVar].data[tSteps, :, :].mean(axis=0)
+                vData = quiverDs[vVar].data[tSteps, :, :].mean(axis=0)
+                if quiverScaleVar is not None:
+                    quivSc = (quiverDs[quiverScaleVar].values[tSteps, :, :
+                                                              ].mean(axis=0))
+        elif np.ndim(quiverDs[uVar]) == 4:
+            jPlev = int(np.arange(len(quiverDs.plev)
+                                  )[quiverDs.plev.values == plev])
+            if diff_flag:
+                kPlev = int(np.arange(len(quiverDiffDs.plev)
+                                      )[quiverDiffDs.plev.values == diffPlev])
+                uData = (
+                    quiverDs[uVar].data[tSteps, jPlev, :, :].mean(axis=0) -
+                    quiverDiffDs[uVar].data[diffTSteps, kPlev, :, :
+                                            ].mean(axis=0))
+                vData = (
+                    quiverDs[vVar].data[tSteps, jPlev, :, :].mean(axis=0) -
+                    quiverDiffDs[vVar].data[diffTSteps, kPlev, :, :
+                                            ].mean(axis=0))
+            else:
+                uData = quiverDs[uVar].data[tSteps, jPlev, :, :].mean(axis=0)
+                vData = quiverDs[vVar].data[tSteps, jPlev, :, :].mean(axis=0)
+    else:
+        uData = None
+        vData = None
+
+    # Normalize and/or rescale uData and vData if requested
+    if quiverScaleVar is not None:
+        quiverNorm_flag = False
+        normMagnitude = ((uData**2 + vData**2)**0.5)
+        # Normalize u and scale so that vector length is quivSc
+        uData = uData/normMagnitude*np.abs(quivSc)
+        # Normalize u and scale so that vector length is quivSc
+        vData = vData/normMagnitude*np.abs(quivSc)
+    if quiverNorm_flag:
+        print('Norming quiver')
+        normMagnitude = ((uData**2 + vData**2)**0.5)
+        uData = uData/normMagnitude
+        vData = vData/normMagnitude
+
+    # Flip vectors if using wind stress (?)
+    if all([quiver_flag,
+            uVar == 'TAUX',
+            vVar == 'TAUY']):
+        print('flipping quivers')
+        uData = -uData
+        vData = -vData
 
     # Compute and subtract off regional mean if requested
     if rmRegMean_flag:
@@ -850,7 +900,7 @@ def plotlatlon(ds,
             print(regMean)
 
     # Set variables to only extend one end of colorbar
-    maxExtendVars = ['PRECT', 'PRECC', 'PRECL', 'precip']
+    maxExtendVars = ['PRECT', 'PRECC', 'PRECL', 'precip', 'U10']
 
     # if plotting difference, extend both ends for all variables
     if diff_flag:
@@ -861,10 +911,11 @@ def plotlatlon(ds,
     if np.ndim(ds[plotVar]) == 4:
         # Add level if original field is 4d
         varName = varName + str(plev)
-    if all([diff_flag, plev != diffPlev]):
+
         # Add differencing of levels if plotting differences and
         #   plev and diffPlev are not the same (for plotting shears)
-        varName = varName + '-' + str(diffPlev)
+        if all([diff_flag, plev != diffPlev]):
+            varName = varName + '-' + str(diffPlev)
 
     # Plot map
     im1, ax = mwp.plotmap(ds.lon,
@@ -892,18 +943,22 @@ def plotlatlon(ds,
                           varName=varName,
                           varUnits=ds[plotVar].units,
                           quiver_flag=quiver_flag,
+                          quiverKey_flag=(not quiverNorm_flag),
                           quiverScale=quiverScale,
                           quiverUnits=quiverUnits,
                           U=uData,
                           Uname=(ds[uVar].name
                                  if uVar in ds.data_vars
                                  else None),
-                          Uunits=(ds[uVar].units
+                          Uunits=((ds[quiverScaleVar].units
+                                   if quiverScaleVar is not None else
+                                   ds[uVar].units)
                                   if uVar in ds.data_vars
                                   else None),
-                          Uref=0.1,
+                          Uref=uRef,  # 0.1,
                           V=vData,
-                          subSamp=(3  # ds['TAUX'].shape[1]/36
+                          subSamp=((3 if subSamp is None else subSamp)
+                                   # ds['TAUX'].shape[1]/36
                                    if uVar in ds.data_vars
                                    else None),
                           tStepLabel_flag=False,

@@ -146,7 +146,7 @@ if __name__ == '__main__':
     obs_flag = False
     ocnOnly_flag = True  # Need to implement to confirm CTindex is right.
     plotBiasRelation_flag = False
-    plotOneMap_flag = True
+    plotOneMap_flag = False
     plotMultiMap_flag = False
     plotGpcpTest_flag = False
     plotRegMean_flag = False
@@ -154,10 +154,10 @@ if __name__ == '__main__':
     plotZonRegMeanHov_flag = False
     prect_flag = True
     regridVertical_flag = True
-    reload_flag = True
+    reload_flag = False
     save_flag = False
     saveSubDir = 'testfigs/'
-    testPlot_flag = False
+    testPlot_flag = True
     verbose_flag = False
 
     # Set new variables to compute when loading
@@ -168,20 +168,16 @@ if __name__ == '__main__':
 
     # Set name(s) of file(s) to load
     versionIds = [  # '01',
-                  # '28',
-                  # '36',
+                  # '28',  '36',
                   # 'ga7.66',
-                  # '119',
-                  '125',
-                  # '161',
-                  # '194',
-                  # '195'
+                  '119', '125',
+                  # '161', '194', '195'
                   ]
     fileBases = [  # 'b.e15.B1850G.f09_g16.pi_control.01',
                  # 'b.e15.B1850G.f09_g16.pi_control.28',
                  # 'b.e15.B1850.f09_g16.pi_control.36',
                  # 'b.e15.B1850.f09_g16.pi_control.all_ga7.66',
-                 # 'b.e15.B1850.f09_g16.pi_control.all.119',
+                 'b.e15.B1850.f09_g16.pi_control.all.119',
                  'b.e20.B1850.f09_g16.pi_control.all.125',
                  # 'b.e20.BHIST.f09_g17.20thC.161_01',
                  # 'b.e20.B1850.f09_g17.pi_control.all.194',
@@ -303,10 +299,9 @@ if __name__ == '__main__':
         print('>> Regridding vertical levels <<')
 
         # Set new levels for regridding
-        #   > Timing works out to about 30s per level per case (seems long...)
-        # 200, 300, 400, 500, 600, 700, 775, 850, 900, 950]),
-        newLevs = np.array([200])
-        regridVars = ['Z3']  # , 'V', 'OMEGA']
+        #   > Timingk works out to about 30s per level per case (seems long...)
+        newLevs = np.array([200, 300, 400, 500, 600, 700, 775, 850, 900, 950])
+        regridVars = ['U', 'V', 'OMEGA']
         regridStartTime = datetime.datetime.now()
         print(regridStartTime.strftime('--> Regrid start time: %X'))
 
@@ -315,7 +310,6 @@ if __name__ == '__main__':
             startTime = datetime.datetime.now()
 
             # Regrid 3D variables using multiprocessing
-            #  Parallelizing over cases(?)
             mpPool = mp.Pool(8)
 
             # Get list of cases for unpacking later
@@ -327,7 +321,6 @@ if __name__ == '__main__':
                 dataSets[vid]['PS'].load()
                 dataSets[vid]['hyam'].load()
                 dataSets[vid]['hybm'].load()
-                dataSets[vid]['P0'].load()
 
             # Create input tuple for regridding to pressure levels
             mpInList = [(dataSets[vid],
@@ -414,14 +407,14 @@ if __name__ == '__main__':
 
     if plotOneMap_flag:
 
-        plotVar = 'Z3'
+        plotVar = 'PRECT'
         uVar = 'U'
         vVar = 'V'
-        plev = 200
-        diffPlev = 200  # plev
-        diff_flag = False  # False
+        plev = 950
+        diffPlev = 950  # plev
+        diff_flag = True  # False
         plotCase = '125'  # '125'
-        diffCase = '125'  # '119'
+        diffCase = '119'  # '119'
 
         # Create figure for plotting
         hf = plt.figure()
@@ -454,7 +447,7 @@ if __name__ == '__main__':
                           levels=None,  # np.arange(-15, 15.1, 1.5),
                           lonLim=np.array([119.5, 270.5]),
                           plev=plev,
-                          quiver_flag=False,  # True,
+                          quiver_flag=True,  # True,
                           quiverDs=(dataSets_rg[plotCase]
                                     if uVar in dataSets_rg[plotCase]
                                     else dataSets[plotCase]),
@@ -1171,44 +1164,33 @@ if __name__ == '__main__':
 
     if testPlot_flag:
         # Set variable to plot
-        plotVar = 'Z3'
-        plotCase = '125'
-        diffCase = '119'
-        diff_flag = False
-        quiver_flag = False
+        plotVar = 'OMEGA'
+        plotCase = '119'
 
         # Set plotting limits
-        latLim = np.array([-20, 20])
+        latLim = np.array([-30, 30])
         lonLim = np.array([210, 260])
         pLim = np.array([1000, 200])
         tLim = np.array([0, 12])
         dt = 1
+
+        # Set other parameters
+        quiver_flag = True
 
         # Compute meridional mean over requested longitudes
         a = dataSets_rg[plotCase].loc[
             dict(lon=slice(lonLim[0], lonLim[-1]),
                  lat=slice(latLim[0]-2, latLim[-1]+2))
             ].mean(dim='lon')
-        b = dataSets_rg[diffCase].loc[
-            dict(lon=slice(lonLim[0], lonLim[-1]),
-                 lat=slice(latLim[0]-2, latLim[-1]+2))
-            ].mean(dim='lon')
 
         # Mean data over requested plotting time period
         a = a.isel(time=slice(tLim[0], tLim[-1], dt)).mean(dim='time')
-        b = b.isel(time=slice(tLim[0], tLim[-1], dt)).mean(dim='time')
 
         # Get contours for plotting
         try:
-            if diff_flag:
-                conts = {'T': np.arange(-2, 2.1, 0.2),
-                         'V': np.arange(-3, 3.1, 0.3),
-                         }[plotVar]
-            else:
-                conts = {'T': np.arange(275, 295.1, 2),
-                         'V': np.arange(-4, 4.1, 0.5),
-                         'Z3': np.arange(0, 15001, 1000),
-                         }[plotVar]
+            conts = {'OMEGA': np.arange(-0.1, 0.101, 0.01),
+                     'V': np.arange(-4, 4.1, 0.5),
+                     }[plotVar]
         except KeyError:
             conts = None
 
@@ -1218,45 +1200,21 @@ if __name__ == '__main__':
         # Plot meridional mean slice
         cset1 = plt.contourf(a['lat'],
                              a['plev'],
-                             a[plotVar] -
-                             (b[plotVar] if diff_flag
-                              else 0),
+                             a[plotVar],
                              conts,
                              cmap='RdBu_r',
                              extend='both')
 
-        # Compute w
+        # Add vectors
         if quiver_flag:
-            R = 287.058  # [J/kg/K]
-            g = 9.80662  # [m/s^2]
-            aw = -a['OMEGA']*R*a['T']/(a['plev']*g)/100
-            bw = -b['OMEGA']*R*b['T']/(b['plev']*g)/100
-
-            latSubSamp = 2
-            quiverUnits = 'inches'
-            quiverScale = 5
-            q1 = plt.quiver(a['lat'][::latSubSamp],
-                            a['plev'],
-                            a['V'][:, ::latSubSamp] -
-                            (b['V'][:, ::latSubSamp] if diff_flag
-                             else 0),
-                            100*(aw[:, ::latSubSamp] -
-                                 (bw[:, ::latSubSamp] if diff_flag
-                                  else 0)
-                                 ),
-                            units=quiverUnits,
-                            scale=quiverScale
-                            )
-            plt.quiverkey(q1, 0.3, 1.05,
-                          1,
-                          '[v ({:d} {:s}), '.format(
-                              1,
-                              mwfn.getstandardunitstring('m/s')) +
-                          'w ({:0.0e} {:s})]'.format(
-                              0.001,
-                              mwfn.getstandardunitstring('m/s')),
-                          coordinates='axes',
-                          labelpos='E')
+            plt.quiver(a['lat'],
+                       a['plev'],
+                       a['V'],
+                       -a['OMEGA']*10,
+                       pivot='tail',
+                       # units=quiverUnits,
+                       # scale=quiverScale
+                       )
 
         # Dress plot
         ax = plt.gca()
@@ -1278,9 +1236,7 @@ if __name__ == '__main__':
                                dataSets_rg[plotCase][plotVar].units))
 
         # Add case number
-        ax.annotate(plotCase +
-                    ('-{:s}'.format(diffCase) if diff_flag
-                     else ''),
+        ax.annotate(plotCase,
                     xy=[0, 1],
                     xycoords='axes fraction',
                     horizontalalignment='left',
@@ -1293,3 +1249,5 @@ if __name__ == '__main__':
                     xycoords='axes fraction',
                     horizontalalignment='right',
                     verticalalignment='bottom')
+
+        # Add vectors?

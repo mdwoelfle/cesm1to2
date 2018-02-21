@@ -139,25 +139,29 @@ if __name__ == '__main__':
 
     # Set options/flags
     diff_flag = False
-    loadErai_flag = False  # True to load ERAI fields
-    loadGpcp_flag = False
+    loadErai_flag = True  # True to load ERAI fields
+    loadGpcp_flag = True
     loadHadIsst_flag = False
     mp_flag = True  # True to use multiprocessing when regridding
     obs_flag = False
     ocnOnly_flag = True  # Need to implement to confirm CTindex is right.
     plotBiasRelation_flag = False
-    plotOneMap_flag = True
+    plotObsMap_flag = False
+    plotOneMap_flag = False
+    plotPai_flag = True
     plotMultiMap_flag = False
     plotGpcpTest_flag = False
     plotRegMean_flag = False
     plotSeasonalBiasRelation_flag = False
     plotZonRegMeanHov_flag = False
+    plotZonRegMeanLines_flag = False
     prect_flag = True
-    regridVertical_flag = True
-    reload_flag = True
+    regridVertical_flag = False
+    reload_flag = False
     save_flag = False
     saveSubDir = 'testfigs/'
     testPlot_flag = False
+    testPlotErai_flag = False
     verbose_flag = False
 
     # Set new variables to compute when loading
@@ -167,33 +171,35 @@ if __name__ == '__main__':
     ncDir, ncSubDir, saveDir = setfilepaths()
 
     # Set name(s) of file(s) to load
-    versionIds = [  # '01',
-                  # '28',
-                  # '36',
-                  # 'ga7.66',
-                  # '119',
+    versionIds = ['01',
+                  '28',
+                  '36',
+                  'ga7.66',
+                  '119',
                   '125',
-                  # '161',
-                  # '194',
-                  # '195'
+                  '161',
+                  '194',
+                  '195'
                   ]
-    fileBases = [  # 'b.e15.B1850G.f09_g16.pi_control.01',
-                 # 'b.e15.B1850G.f09_g16.pi_control.28',
-                 # 'b.e15.B1850.f09_g16.pi_control.36',
-                 # 'b.e15.B1850.f09_g16.pi_control.all_ga7.66',
-                 # 'b.e15.B1850.f09_g16.pi_control.all.119',
-                 'b.e20.B1850.f09_g16.pi_control.all.125',
-                 # 'b.e20.BHIST.f09_g17.20thC.161_01',
-                 # 'b.e20.B1850.f09_g17.pi_control.all.194',
-                 # 'b.e20.B1850.f09_g17.pi_control.all.195',
-                 ]
+    fileBaseDict = {'01': 'b.e15.B1850G.f09_g16.pi_control.01',
+                    '28': 'b.e15.B1850G.f09_g16.pi_control.28',
+                    '36': 'b.e15.B1850.f09_g16.pi_control.36',
+                    'ga7.66': 'b.e15.B1850.f09_g16.pi_control.all_ga7.66',
+                    '119': 'b.e15.B1850.f09_g16.pi_control.all.119',
+                    '125': 'b.e20.B1850.f09_g16.pi_control.all.125',
+                    '161': 'b.e20.BHIST.f09_g17.20thC.161_01',
+                    '194': 'b.e20.B1850.f09_g17.pi_control.all.194',
+                    '195': 'b.e20.B1850.f09_g17.pi_control.all.195',
+                    }
     loadSuffixes = ['_' + '{:02d}'.format(mon + 1) + '_climo.nc'
                     for mon in range(12)]
 
     # Create list of files to load
-    loadFileLists = {versionIds[j]: [ncDir + fileBases[j] + '/' +
+    loadFileLists = {versionIds[j]: [ncDir + fileBaseDict[versionIds[j]] +
+                                     '/' +
                                      ncSubDir +
-                                     fileBases[j] + loadSuffix
+                                     fileBaseDict[versionIds[j]] +
+                                     loadSuffix
                                      for loadSuffix in loadSuffixes]
                      for j in range(len(versionIds))}
 
@@ -221,7 +227,9 @@ if __name__ == '__main__':
     for vid in versionIds:
         dataSets[vid].attrs['id'] = vid
 
-    if any([obs_flag, plotGpcpTest_flag, loadGpcp_flag, loadHadIsst_flag]):
+    if any([obs_flag, plotGpcpTest_flag,
+            loadGpcp_flag, loadHadIsst_flag,
+            loadErai_flag]):
 
         if loadGpcp_flag or plotGpcpTest_flag:
             # # Load GPCP
@@ -232,9 +240,9 @@ if __name__ == '__main__':
             gpcpClimoFile = 'gpcp_197901-201012_climo.nc'
 
             # Load GPCP for all years and add id
-            if plotGpcpTest_flag:
-                gpcpDs = xr.open_dataset(gpcpDir + gpcpFile)
-                gpcpDs.attrs['id'] = 'GPCP_all'
+            # if plotGpcpTest_flag:
+            gpcpDs = xr.open_dataset(gpcpDir + gpcpFile)
+            gpcpDs.attrs['id'] = 'GPCP_all'
 
             # Load GPCP from both climo and add id
             gpcpClimoDs = xr.open_dataset(gpcpDir + gpcpClimoFile)
@@ -296,17 +304,19 @@ if __name__ == '__main__':
 # %% Regrid 3D fields
 
     # Regridding with multiprocessing
-    if all([mp_flag,
-            regridVertical_flag,
-            any([reload_flag, load_flag])]):
+    if False:
+        # all([mp_flag,
+        #    regridVertical_flag,
+        #    any([reload_flag, load_flag])]):
 
         print('>> Regridding vertical levels <<')
 
         # Set new levels for regridding
         #   > Timing works out to about 30s per level per case (seems long...)
         # 200, 300, 400, 500, 600, 700, 775, 850, 900, 950]),
-        newLevs = np.array([200])
-        regridVars = ['Z3']  # , 'V', 'OMEGA']
+        newLevs = np.array([200, 300, 400, 500, 600, 675,
+                            750, 800, 850, 900, 950, 990])
+        regridVars = ['V', 'OMEGA', 'T']  # , 'V', 'OMEGA']
         regridStartTime = datetime.datetime.now()
         print(regridStartTime.strftime('--> Regrid start time: %X'))
 
@@ -373,11 +383,12 @@ if __name__ == '__main__':
         print(datetime.datetime.now() - regridStartTime)
         print('\n')
 
-    elif all([regridVertical_flag,
-              any([reload_flag, load_flag])]):
+    elif False:  # all([regridVertical_flag,
+        #      any([reload_flag, load_flag])]):
         """
         DEPRECATED
         """
+        raise NotImplementedError('This code should never be run. Too slow.')
         startTime = datetime.datetime.now()
         # Set levels for regridding
         newLevs = np.array([800, 900])
@@ -401,8 +412,83 @@ if __name__ == '__main__':
         print(datetime.datetime.now() - startTime)
         print('##------------------------------##\n')
 
+# %% Regrid 3D fields -- NEW
+
+    # Regridding with multiprocessing
+    if all([mp_flag,
+            regridVertical_flag,
+            any([reload_flag, load_flag])]):
+
+        print('>> Regridding vertical levels22 <<')
+
+        # Set new levels for regridding
+        #   > Timing works out to about 30s per level per case (seems long...)
+        # 200, 300, 400, 500, 600, 700, 775, 850, 900, 950]),
+        newLevs = np.array([200, 300, 400, 500, 600, 675,
+                            750, 800, 850, 900, 950, 990
+                            ])
+        regridVars = ['V', 'OMEGA', 'T']  # , 'V', 'OMEGA']
+        regridStartTime = datetime.datetime.now()
+        print(regridStartTime.strftime('--> Regrid start time: %X'))
+
+        startTime = datetime.datetime.now()
+
+        # Regrid 3D variables using multiprocessing
+        #  Parallelizing over cases(?)
+        mpPool = mp.Pool(8)
+
+        # Get list of cases for unpacking later
+        versionIds = versionIds
+
+        # Load all datasets to memory to enable multiprocessing
+        for vid in versionIds:
+            for regridVar in regridVars:
+                dataSets[vid][regridVar].load()
+            dataSets[vid]['PS'].load()
+            dataSets[vid]['hyam'].load()
+            dataSets[vid]['hybm'].load()
+            dataSets[vid]['P0'].load()
+
+        # Create input tuple for regridding to pressure levels
+        mpInList = [(dataSets[vid],
+                     regridVars,
+                     newLevs,
+                     {'hCoeffs': {
+                         'hyam': dataSets[vid]['hyam'].mean(dim='time').values,
+                         'hybm': dataSets[vid]['hybm'].mean(dim='time').values,
+                         'P0': dataSets[vid]['P0'].values[0]},
+                      'modelid': 'cesm',
+                      'psVar': 'PS',
+                      'verbose_flag': False}
+                     )
+                    for vid in versionIds]
+
+        # Call multiprocessing of regridding
+        # regriddedVars = mpPool.map(mwfn.regriddssigmatopres_mp,
+        #                            mpInList)
+        # regriddedVars = mpPool.map_async(mwfn.regriddssigmatopres_mp,
+        #                                 mpInList)
+        dsOut = mpPool.map_async(mwfn.convertsigmatopresds_mp,
+                                 mpInList)
+
+        # Close multiprocessing pool
+        dsOut = dsOut.get()
+        mpPool.close()
+        mpPool.terminate()  # Not proper,
+        #                   #    but may be needed to work properly
+        mpPool.join()
+
+        print('\n##------------------------------##')
+        print('Time to regrid with mp:')
+        print(datetime.datetime.now() - startTime)
+        print('##------------------------------##\n')
+
+        # Convert dsOut from list of datasets to dictionary of datasets
+        dataSets_rg = {dsOut[j].id: dsOut[j]
+                       for j in range(len(dsOut))}
 
 # %% Plot one map
+
     # set plotting parameters
     latLim = np.array([-30, 30])
     lonLim = np.array([119.5, 270.5])
@@ -410,18 +496,33 @@ if __name__ == '__main__':
     latLbls = np.arange(-30, 31, 10)
     lonLbls = np.arange(120, 271, 30)
 
-    tSteps = np.arange(0, 12)
+    tSteps = np.arange(1, 5)
 
     if plotOneMap_flag:
 
-        plotVar = 'Z3'
-        uVar = 'U'
-        vVar = 'V'
+        plotVar = 'PRECT'
         plev = 200
-        diffPlev = 200  # plev
-        diff_flag = False  # False
-        plotCase = '125'  # '125'
-        diffCase = '125'  # '119'
+        diffPlev = plev
+        diff_flag = True  # False
+        # plotCase = ''  # '125'
+        # diffCase = 'ga7.66'  # '119'
+        plotCase, diffCase = [['ga7.66', '36'],
+                              ['119', 'ga7.66'],
+                              ['125', '119'],
+                              ['125', '36']][3]
+        quiver_flag = True
+        uVar = 'TAUX'
+        vVar = 'TAUY'
+
+        # Ensure dataSets_rg exists
+        try:
+            dataSets_rg[plotCase]
+        except NameError:
+            dataSets_rg = {jCase: ['foo', 'bar']
+                           for jCase in list(dataSets.keys())}
+        except KeyError:
+            dataSets_rg = {jCase: ['foo', 'bar']
+                           for jCase in list(dataSets.keys())}
 
         # Create figure for plotting
         hf = plt.figure()
@@ -454,7 +555,7 @@ if __name__ == '__main__':
                           levels=None,  # np.arange(-15, 15.1, 1.5),
                           lonLim=np.array([119.5, 270.5]),
                           plev=plev,
-                          quiver_flag=False,  # True,
+                          quiver_flag=quiver_flag,
                           quiverDs=(dataSets_rg[plotCase]
                                     if uVar in dataSets_rg[plotCase]
                                     else dataSets[plotCase]),
@@ -480,7 +581,10 @@ if __name__ == '__main__':
 
             # Set file name for saving
             tString = 'mon'
-            saveFile = (plotVar + '_latlon_' +
+            saveFile = (('d' if diff_flag else '') +
+                        plotVar +
+                        '{:d}'.format(plev) +
+                        '_latlon_' +
                         tString +
                         '{:03.0f}'.format(tSteps[0]) + '-' +
                         '{:03.0f}'.format(tSteps[-1]))
@@ -493,6 +597,70 @@ if __name__ == '__main__':
             mwp.savefig(saveDir + saveSubDir + saveFile,
                         shape=np.array([fx, fy]))
             plt.close('all')
+
+# %% Plot map of obs
+
+    if plotObsMap_flag:
+        plotVar = 'OMEGA'
+        uVar = 'U'
+        vVar = 'V'
+        plev = 200
+        diffPlev = plev
+        diff_flag = False  # False
+        plotCase = '125'  # '125'
+        diffCase = '119'  # '119'
+
+        # Create figure for plotting
+        hf = plt.figure()
+
+        # Get quiver properties
+        quiverProps = getquiverprops(uVar, vVar, plev,
+                                     diff_flag=diff_flag)
+
+        obsDs = {'OMEGA': erai3dDs}[plotVar]
+        obsVar = {'OMEGA': 'w'}[plotVar]
+        obsQDs = {'U': erai3dDs}[uVar]
+        obsUVar = {'U': 'u'}[uVar]
+        obsVVar = {'V': 'v'}[vVar]
+
+        # Plot some fields for comparison
+        c1to2p.plotlatlon(obsDs,  # hadIsstDs
+                          obsVar,
+                          box_flag=False,
+                          boxLat=np.array([-3, 3]),
+                          boxLon=np.array([180, 220]),
+                          caseString=None,
+                          cbar_flag=True,
+                          # cbar_dy=0.001,
+                          cbar_height=0.02,
+                          cMap=None,  # 'RdBu_r',
+                          compcont_flag=True,
+                          diff_flag=False,  # diff_flag,
+                          # diffDs=(dataSets_rg[diffCase]
+                          #        if plotVar in dataSets_rg[diffCase]
+                          #        else dataSets[diffCase]),  # gpcpClimoDs,
+                          # diffPlev=diffPlev,
+                          fontSize=12,
+                          latLim=np.array([-20, 20]),
+                          levels=None,  # np.arange(-15, 15.1, 1.5),
+                          lonLim=np.array([119.5, 270.5]),
+                          plev=plev,
+                          quiver_flag=False,  # True,
+                          quiverDs=obsQDs,
+                          # quiverDiffDs=(dataSets_rg[diffCase]
+                          #              if uVar in dataSets_rg[diffCase]
+                          #              else dataSets[diffCase]),
+                          quiverNorm_flag=False,
+                          quiverScale=quiverProps['quiverScale'],
+                          quiverScaleVar=None,
+                          rmRegMean_flag=False,
+                          stampDate_flag=False,
+                          tSteps=tSteps,
+                          tStepLabel_flag=True,
+                          uRef=quiverProps['uRef'],
+                          uVar=obsUVar,
+                          vVar=obsVVar,
+                          )
 
 # %% Load and plot GPCP as a test
 
@@ -579,16 +747,16 @@ if __name__ == '__main__':
     if plotRegMean_flag:
 
         # Set variable for plotting
-        plotVar = 'TS'
+        plotVar = 'PRECT'
 
         # Set plotting flags and specifications
-        rmAnnMean_flag = True
-        plotAnnMean_flag = False
+        rmAnnMean_flag = False
+        plotAnnMean_flag = True  # False
         plotPeriodMean_flag = False
         # tSteps = np.arange(1, 5)
         tSteps = np.append(np.arange(5, 12), 0)
         divideByTropMean_flag = False
-        tropLatLim = np.array([-30, 30])
+        tropLatLim = np.array([-20, 20])
         tropLonLim = np.array([0, 360])
 
         # Set default plot values
@@ -597,16 +765,19 @@ if __name__ == '__main__':
 
         if plotVar in ['PRECT', 'PRECL', 'PRECC']:
             ds = dataSets
-            yLim = np.array(([0, 2] if divideByTropMean_flag
-                             else [0.5, 4.7]))
-            rmRefRegMean_flag = False
+            yLim = np.array([0, 2]
+                            if divideByTropMean_flag
+                            else [0, 6])
             plotObs_flag = True
             latLim = np.array([-20, 0])
             lonLim = np.array([210, 260])
             obsDs = gpcpClimoDs
             obsVar = 'precip'
-            ocnOnly_flag = False
-            title = '2xITCZ Index'
+            ocnOnly_flag = True
+            rmRefRegMean_flag = False
+            refLatLim = np.array([-20, 0])
+            refLonLim = np.array([0, 360])
+            title = 'PAI'  # '2xITCZ Index'
         elif plotVar in ['PS']:
             ds = dataSets
             rmRefRegMean_flag = True
@@ -965,10 +1136,293 @@ if __name__ == '__main__':
                        else '')
                       )
 
-    # Plot index through model versions
-    # Use scatter plot with version on x-axis and index on y-axis
+# %% Plot predefined indices through time or as annual mean
+    if plotPai_flag:
 
-    # Change x-axis labels to be model version rather than generic number
+        # Set name of index to plot
+        indexName = 'PAI'
+        plotVar = None
+
+        # Set plotting flags and specifications
+        rmAnnMean_flag = False
+        ocnOnly_flag = False
+        plotAnnMean_flag = True
+        plotPeriodMean_flag = False
+        tSteps = np.arange(1, 5)
+        # tSteps = np.append(np.arange(0, 12), 0)
+
+        # Set default plot values
+        title = indexName
+        yLim = None
+
+        if indexName in ['dITCZ']:
+            ds = dataSets
+            yLim = np.array([0, 6])
+            yLim_annMean = np.array([0, 3])
+            plotObs_flag = True
+            obsDx = gpcpDs
+            obsVar = 'precip'
+            ocnOnly_flag = False
+            title = 'Double-ITCZ Index'
+        elif indexName in ['PAI']:
+            ds = dataSets
+            yLim = np.array([-1.5, 1.5])
+            yLim_annMean = np.array([0, 0.5])
+            plotObs_flag = True
+            # obsDs = gpcpClimoDs
+            obsDs = gpcpDs
+            obsVar = 'precip'
+            ocnOnly_flag = False
+            title = 'Precipitation Asymmetry Index'
+
+        if plotVar is None:
+            plotVar = {'ditcz': 'PRECT',
+                       'pai': 'PRECT',
+                       }[indexName.lower()]
+
+        # Create dictionary to hold annual mean value (and colors)
+        annMean = dict()
+        timeMean = dict()
+        colorDict = getcolordict()
+
+        # Create figure for plotting
+        hf = plt.figure()
+
+        for vid in versionIds:
+            # Compute PAI through time
+            paiDa = c1to2p.calcregmeanindex(ds[vid],
+                                            indexName,
+                                            indexType=None,
+                                            indexVar=plotVar,
+                                            ocnOnly_flag=ocnOnly_flag,
+                                            )
+
+            # Pull regional mean through time and plot
+            pData = (paiDa.values - paiDa.mean(dim='time').values
+                     if rmAnnMean_flag
+                     else paiDa.values)
+            hl, = plt.plot(np.arange(1, 13),
+                           pData,
+                           color=colorDict[vid],
+                           label=vid,
+                           marker='o',
+                           )
+            annMean[vid] = paiDa.mean(dim='time')
+            timeMean[vid] = paiDa.values[tSteps].mean()
+
+        # Repeat above for obs
+        if plotObs_flag:
+            # Compute PAI through time
+            obsPaiDa = c1to2p.calcregmeanindex(obsDs,
+                                               indexName,
+                                               indexType=None,
+                                               indexVar=obsVar,
+                                               ocnOnly_flag=False,
+                                               qc_flag=False,
+                                               )
+
+            # Ensure plotting on correct figure
+            plt.figure(hf.number)
+
+            # Get data for plotting
+            #   also remove annual mean if requested
+            try:
+                pData = (obsPaiDa.values -
+                         obsPaiDa.mean(dim='time').values
+                         if rmAnnMean_flag
+                         else obsPaiDa.values)
+            except ValueError:
+                pData = (obsPaiDa.values -
+                         obsPaiDa.mean(dim='month').values
+                         if rmAnnMean_flag
+                         else obsPaiDa.values)
+
+            # Plot time series
+            try:
+                hl, = plt.plot(np.arange(1, 13),
+                               pData,
+                               lw=2,
+                               c=colorDict['obs'],
+                               label=obsDs.id,
+                               marker='^'
+                               )
+            except ValueError:
+                # Compute monthly climatologies and plot
+                pData = np.reshape(pData,
+                                   [int(pData.size/12), 12]).mean(axis=0)
+                hl, = plt.plot(np.arange(1, 13),
+                               pData,
+                               lw=2,
+                               c=colorDict['obs'],
+                               label=obsDs.id,
+                               marker='^'
+                               )
+
+            # Compute annual means
+            try:
+                annMean['obs'] = obsPaiDa.mean(dim='time')
+            except ValueError:
+                annMean['obs'] = obsPaiDa.mean(dim='month')
+
+            # Compute mean over given timesteps
+            timeMean['obs'] = pData[tSteps].mean()
+
+        plt.xticks(np.arange(1, 13))
+        plt.xlabel('Month')
+
+        plt.ylabel('{:s}'.format(title) +
+                   (' ({:s})'.format(paiDa.units)
+                    if paiDa.units is not None
+                    else '') +
+                   ('\n[Annual mean removed]' if rmAnnMean_flag else '')
+                   )
+        plt.ylim(yLim)
+
+        plt.legend(title='Version', ncol=2)
+
+        plt.title('Seasonal cycle of {:s}'.format(title) +
+                  ('\n[Annual mean removed]' if rmAnnMean_flag else '')
+                  )
+
+        # Add annotation of years used to compute climatology
+        if all([plotVar == 'TS', plotObs_flag]):
+            plt.annotate('(obs: {:d}-{:d})'.format(hadIsstYrs[0],
+                                                   hadIsstYrs[1]),
+                         xy=(1, 1),
+                         xycoords='axes fraction',
+                         horizontalalignment='right',
+                         verticalalignment='bottom',
+                         )
+
+        # Add grid
+        plt.grid()
+
+        # Clean up figure
+        plt.tight_layout()
+
+        # Save figure if requested
+        if save_flag:
+            # Set directory for saving
+            if saveDir is None:
+                saveDir = setfilepaths()[2]
+
+            # Set file name for saving
+            tString = 'mon'
+            saveFile = ('seascyc_' + indexName.lower())
+
+            # Set saved figure size (inches)
+            fx, fy = hf.get_size_inches()
+
+            # Save figure
+            print(saveDir + saveFile)
+            mwp.savefig(saveDir + saveSubDir + saveFile,
+                        shape=np.array([fx, fy]))
+            plt.close('all')
+
+        # Plot annual mean values
+        if plotAnnMean_flag:
+            hf = plt.figure()
+            hf.set_size_inches(6, 3, forward=True)
+            # print([annMean[j].values for j in versionIds])
+            plt.scatter(np.arange(1, len(annMean) +
+                                  (0 if plotObs_flag else 1)),
+                        np.array([annMean[j] for j in versionIds]),
+                        marker='o',
+                        c=[colorDict[j] for j in versionIds],
+                        s=80,
+                        )
+            if 'obs' in annMean.keys():
+                # print(annMean['obs'])
+                plt.scatter([len(annMean)],
+                            annMean['obs'],
+                            marker='^',
+                            c=colorDict['obs'],
+                            s=80,
+                            )
+
+            plt.xticks(np.arange(1, len(annMean) + 1),
+                       ((versionIds + ['obs'])
+                        if 'obs' in annMean.keys()
+                        else versionIds))
+            plt.xlabel('Version')
+
+            plt.ylabel(indexName)
+            plt.ylim(yLim_annMean)
+
+            plt.grid(ls='--')
+            plt.gca().set_axisbelow(True)
+
+            plt.title('Annual mean {:s}'.format(title))
+            plt.tight_layout()
+
+            # Save figure if requested
+            if save_flag:
+                # Set directory for saving
+                if saveDir is None:
+                    saveDir = setfilepaths()[2]
+
+                # Set file name for saving
+                tString = 'mon'
+                saveFile = ('annmean_' + indexName.lower())
+
+                # Set saved figure size (inches)
+                fx, fy = hf.get_size_inches()
+
+                # Save figure
+                print(saveDir + saveFile)
+                mwp.savefig(saveDir + saveSubDir + saveFile,
+                            shape=np.array([fx, fy]))
+                plt.close('all')
+
+        # Plot time mean values
+        if plotPeriodMean_flag:
+            plt.figure()
+
+            plt.scatter(np.arange(1, len(timeMean) +
+                                  (0 if plotObs_flag else 1)),
+                        np.array([timeMean[j] for j in versionIds]),
+                        marker='o',
+                        c=[colorDict[j] for j in versionIds],
+                        s=80,
+                        )
+            if 'obs' in timeMean.keys():
+                plt.scatter([len(timeMean)],
+                            timeMean['obs'],
+                            marker='^',
+                            c=colorDict['obs'],
+                            s=80,
+                            )
+
+            plt.xticks(np.arange(1, len(timeMean) + 1),
+                       ((versionIds + ['obs'])
+                        if 'obs' in timeMean.keys()
+                        else versionIds))
+            plt.xlabel('Version')
+
+            plt.ylabel(plotVar + ' (' +
+                       mwp.getlatlimstring(latLim) + ', ' +
+                       mwp.getlonlimstring(lonLim, lonFormat='EW') +
+                       ((' minus \n' +
+                         mwp.getlatlimstring(refLatLim) + ', ' +
+                         mwp.getlonlimstring(lonLim, lonFormat='EW')
+                         ) if rmRefRegMean_flag else '') +
+                       ')'
+                       )
+            plt.ylim(yLim)
+
+            plt.grid(ls='--')
+            plt.gca().set_axisbelow(True)
+
+            monIds = ['J', 'F', 'M', 'A', 'M', 'J',
+                      'J', 'A', 'S', 'O', 'N', 'D']
+            tStepString = ''.join([monIds[tStep] for tStep in tSteps])
+            if tStepString == 'JFD':
+                tStepString = 'DJF'
+            plt.title('{:s} mean {:s}'.format(tStepString, title) +
+                      ('\n(divided by Tropical Mean)' if divideByTropMean_flag
+                       else '')
+                      )
+
 
 # %% Correlate bias indices (CTI, dTICZ, Walker)
     if plotBiasRelation_flag:
@@ -1167,21 +1621,59 @@ if __name__ == '__main__':
                             mwp.getlonlimstring(lonLim, '') +
                             'obs')
 
+# %% Plot time mean, zonal mean lines
+    if plotZonRegMeanLines_flag:
+
+        # Set flags and options
+        latLim = np.array([-25, 25])
+        lonLim = np.array([210, 260])
+        plotLatLim = np.array([-20, 20])
+
+        plotVar = 'PRECT'
+
+        # Plot versions
+        c1to2p.plotmultizonregmeanlines(dataSets,
+                                        versionIds,
+                                        plotVar,
+                                        colorDict=getcolordict(),
+                                        diff_flag=False,
+                                        diffIdList=None,
+                                        diffDs=None,
+                                        diffVar=None,
+                                        fontSize=12,
+                                        gsEdges=[0.1, 1.0, 0.15, 0.95],
+                                        latLim=latLim,
+                                        latlbls=None,
+                                        lonLim=lonLim,
+                                        legend_flag=True,
+                                        lw=2,
+                                        obsDs=gpcpClimoDs,
+                                        ocnOnly_flag=False,
+                                        plotObs_flag=True,
+                                        plotLatLim=plotLatLim,
+                                        save_flag=save_flag,
+                                        saveDir=setfilepaths()[2] + saveSubDir,
+                                        stdUnits_flag=True,
+                                        subFigCountStart='a',
+                                        )
+
+
 # %% Plot pressure-latitude figure with vectors (potentially)
 
     if testPlot_flag:
         # Set variable to plot
-        plotVar = 'Z3'
+        plotVar = 'V'
         plotCase = '125'
         diffCase = '119'
-        diff_flag = False
-        quiver_flag = False
+        diff_flag = True
+        quiver_flag = True
+        # save_flag = True
 
         # Set plotting limits
         latLim = np.array([-20, 20])
         lonLim = np.array([210, 260])
         pLim = np.array([1000, 200])
-        tLim = np.array([0, 12])
+        tLim = np.array([1, 5])
         dt = 1
 
         # Compute meridional mean over requested longitudes
@@ -1205,7 +1697,7 @@ if __name__ == '__main__':
                          'V': np.arange(-3, 3.1, 0.3),
                          }[plotVar]
             else:
-                conts = {'T': np.arange(275, 295.1, 2),
+                conts = {'T': np.arange(225, 295.1, 5),
                          'V': np.arange(-4, 4.1, 0.5),
                          'Z3': np.arange(0, 15001, 1000),
                          }[plotVar]
@@ -1229,8 +1721,9 @@ if __name__ == '__main__':
         if quiver_flag:
             R = 287.058  # [J/kg/K]
             g = 9.80662  # [m/s^2]
-            aw = -a['OMEGA']*R*a['T']/(a['plev']*g)/100
-            bw = -b['OMEGA']*R*b['T']/(b['plev']*g)/100
+            aw = -a['OMEGA']*R*a['T']/(a['plev']*100*g)  # *100 converts to Pa
+            bw = -b['OMEGA']*R*b['T']/(b['plev']*100*g)  # *100 converts to Pa
+            wScale = 100
 
             latSubSamp = 2
             quiverUnits = 'inches'
@@ -1240,10 +1733,10 @@ if __name__ == '__main__':
                             a['V'][:, ::latSubSamp] -
                             (b['V'][:, ::latSubSamp] if diff_flag
                              else 0),
-                            100*(aw[:, ::latSubSamp] -
-                                 (bw[:, ::latSubSamp] if diff_flag
-                                  else 0)
-                                 ),
+                            wScale*(aw[:, ::latSubSamp] -
+                                    (bw[:, ::latSubSamp] if diff_flag
+                                     else 0)
+                                    ),
                             units=quiverUnits,
                             scale=quiverScale
                             )
@@ -1253,7 +1746,7 @@ if __name__ == '__main__':
                               1,
                               mwfn.getstandardunitstring('m/s')) +
                           'w ({:0.0e} {:s})]'.format(
-                              0.001,
+                              1/wScale,
                               mwfn.getstandardunitstring('m/s')),
                           coordinates='axes',
                           labelpos='E')
@@ -1293,3 +1786,167 @@ if __name__ == '__main__':
                     xycoords='axes fraction',
                     horizontalalignment='right',
                     verticalalignment='bottom')
+
+        if save_flag:
+            # Set directory for saving
+            if saveDir is None:
+                saveDir = setfilepaths()[2] + saveSubDir
+            saveDir = setfilepaths()[2] + 'atm/meridslices/'
+
+            # Set filename for saving
+            saveFile = (('d' if diff_flag else '') +
+                        plotVar +
+                        ('_UW' if quiver_flag else '') +
+                        '_' + plotCase +
+                        ('-{:s}'.format(diffCase) if diff_flag else '') +
+                        '_' + mwp.getlatlimstring(latLim, '') +
+                        '_' + mwp.getlonlimstring(lonLim, '') +
+                        '_mon{:02d}-{:02d}'.format(tLim[0], tLim[-1]-1)
+                        )
+
+            # Set saved figure size (inches)
+            fx = hf.get_size_inches()[0]
+            fy = hf.get_size_inches()[1]
+
+            # Save figure
+            print(saveDir + saveFile)
+            # mwp.savefig(saveDir + saveFile,
+            #             shape=np.array([fx, fy]))
+            # plt.close('all')
+
+    # %% Plot meridional slices of obs
+    # Plot observed meridional slice
+    if testPlotErai_flag:  # all([testPlot_flag,
+        #    loadErai_flag]):
+        # Set variable to plot
+        plotVar = 't'
+        quiver_flag = True
+        save_flag = False
+
+        # Set plotting limits
+        latLim = np.array([-20, 20])
+        lonLim = np.array([210, 260])
+        pLim = np.array([1000, 200])
+        # tLim = np.array([1, 5])
+        dt = 1
+
+        # Compute meridional mean over requested longitudes
+        a = erai3dDs.loc[
+            dict(lon=slice(lonLim[0], lonLim[-1]),
+                 lat=slice(latLim.max()+2, latLim.min()-2))
+            ].mean(dim='lon')
+
+        # Mean data over requested plotting time period
+        a = a.isel(time=slice(tLim[0], tLim[-1], dt)).mean(dim='time')
+
+        # Get contours for plotting
+        try:
+            conts = {'t': np.arange(225, 295.1, 5),
+                     'u': np.arange(-24, 24.1, 2),
+                     'V': np.arange(-4, 4.1, 0.5),
+                     'Z3': np.arange(0, 15001, 1000),
+                     }[plotVar]
+        except KeyError:
+            conts = None
+
+        # Create figure for plotting
+        hf = plt.figure()
+
+        # Plot meridional mean slice
+        cset1 = plt.contourf(a['lat'],
+                             a['plev'],
+                             a[plotVar],
+                             conts,
+                             cmap='RdBu_r',
+                             extend='both')
+
+        # Compute w
+        if quiver_flag:
+            R = 287.058  # [J/kg/K]
+            g = 9.80662  # [m/s^2]
+            w = -a['w']*R*a['t']/(a['plev']*100*g)  # *100 to covert to Pa
+            wScale = 100
+
+            latSubSamp = 2
+            quiverUnits = 'inches'
+            quiverScale = 5
+            q1 = plt.quiver(a['lat'][::latSubSamp],
+                            a['plev'],
+                            a['v'][:, ::latSubSamp],
+                            wScale*w[:, ::latSubSamp],
+                            units=quiverUnits,
+                            scale=quiverScale
+                            )
+            plt.quiverkey(q1, 0.3, 1.05,
+                          1,
+                          '[v ({:d} {:s}), '.format(
+                              1,
+                              mwfn.getstandardunitstring(
+                                  erai3dDs['v'].units)) +
+                          'w ({:0.0e} {:s})]'.format(
+                              1/wScale,
+                              mwfn.getstandardunitstring(
+                                  'm/s')),
+                          coordinates='axes',
+                          labelpos='E')
+
+        # Dress plot
+        ax = plt.gca()
+        # Flip y direction
+        ax.invert_yaxis()
+
+        # Set x and y limits
+        plt.xlim(latLim)
+        plt.ylim(pLim)
+
+        # Label axes
+        plt.xlabel('Latitude')
+        plt.ylabel('Pressure ({:s})'.format(a['plev'].units))
+
+        # Add colorbar
+        hcb = plt.colorbar(cset1,
+                           label='{:s} ({:s})'.format(
+                               plotVar,
+                               erai3dDs[plotVar].units))
+
+        # Add case number
+        ax.annotate('ERAI',
+                    xy=[0, 1],
+                    xycoords='axes fraction',
+                    horizontalalignment='left',
+                    verticalalignment='bottom')
+
+        # Add time range
+        tStepString = 't = [{:0d}, {:0d}]'.format(tLim[0], tLim[-1])
+        ax.annotate(tStepString,
+                    xy=[1, 1],
+                    xycoords='axes fraction',
+                    horizontalalignment='right',
+                    verticalalignment='bottom')
+
+        if save_flag:
+            # Set directory for saving
+            if saveDir is None:
+                saveDir = setfilepaths()[2] + saveSubDir
+            saveDir = setfilepaths()[2] + 'atm/meridslices/'
+
+            # Set filename for saving
+            saveFile = (('d' if diff_flag else '') +
+                        plotVar +
+                        ('_UW' if quiver_flag else '') +
+                        '_' + plotCase +
+                        ('-{:s}'.format(diffCase) if diff_flag else '') +
+                        '_' + mwp.getlatlimstring(latLim, '') +
+                        '_' + mwp.getlonlimstring(lonLim, '') +
+                        '_mon{:02d}-{:02d}'.format(tLim[0], tLim[-1]-1)
+                        )
+
+            # Set saved figure size (inches)
+            fx = hf.get_size_inches()[0]
+            fy = hf.get_size_inches()[1]
+
+            # Save figure
+            print(saveDir + saveFile)
+            mwp.savefig(saveDir + saveFile,
+                        shape=np.array([fx, fy]))
+            # plt.close('all')

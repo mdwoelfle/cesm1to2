@@ -48,6 +48,7 @@ def calcregmeanindex(ds,
                      indexType=None,
                      indexVar=None,
                      ocnOnly_flag=False,
+                     qc_flag=False,
                      ):
     """
     Compute regional mean indices
@@ -114,6 +115,19 @@ def calcregmeanindex(ds,
                                          ocnOnly_flag=ocnOnly_flag,
                                          pressureVar=indexVar,
                                          )
+    elif indexName.lower() in ['pai', 'precipasymmetry']:
+        # Assigne default index if none provded
+        if indexType is None:
+            indexType = 'HwangFrierson2012'
+        if indexVar is None:
+            indexVar == 'PRECT'
+
+        # Compute precipitation asymmetry index
+        indexDa = mwfn.calcdsprecipasymindex(ds,
+                                             indexType=indexType,
+                                             precipVar=indexVar,
+                                             qc_flag=qc_flag,
+                                             )
     else:
         raise NameError('Cannot find function to compute ' +
                         'index: {:s}'.format(indexName))
@@ -247,6 +261,7 @@ def getmapcontlevels(plotVar,
                       'FNS': np.arange(-200, 200.1, 20),
                       'FSNS': np.arange(-50, 50.1, 5.),
                       'LHFLX': np.arange(-50, 50.1, 5),
+                      'OMEGA': np.arange(-0.12, 0.12001, 0.01),
                       'OMEGA500': np.arange(-0.125, 0.1251, 0.0125),
                       'OMEGA850': np.arange(-0.125, 0.1251, 0.0125),
                       'PRECC': np.arange(-10, 10.1, 1),
@@ -268,7 +283,8 @@ def getmapcontlevels(plotVar,
                       'precip': np.arange(-10, 10.1, 1),
                       'sst': np.arange(-2, 2.1, 0.2),
                       'sverdrupx': np.arange(-1.5e5, 1.501e5, 1.5e4),
-                      'MGx': np.arange(-1.5e5, 1.501e5, 1.5e4)
+                      'MGx': np.arange(-1.5e5, 1.501e5, 1.5e4),
+                      'w': np.arange(-0.12, 0.12001, 0.01),
                       }[plotVar]
         except KeyError:
             levels = None
@@ -279,6 +295,7 @@ def getmapcontlevels(plotVar,
                       'FSNS': np.arange(0, 400.1, 20.),
                       'LHFLX': np.arange(0, 200.1, 10),
                       'MGx': np.arange(-1.5e5, 1.501e5, 1.5e4),
+                      'OMEGA': np.arange(-0.12, 0.12001, 0.01),
                       'OMEGA500': np.arange(-0.125, 0.1251, 0.0125),
                       'OMEGA850': np.arange(-0.125, 0.1251, 0.0125),
                       'PRECC': np.arange(0, 20.1, 2),
@@ -299,6 +316,7 @@ def getmapcontlevels(plotVar,
                       'precip': np.arange(0, 20.1, 2),
                       'sst': np.arange(290, 305, 1),
                       'sverdrupx': np.arange(-1.5e5, 1.501e5, 1.5e4),
+                      'w': np.arange(-0.12, 0.12001, 0.01),
                       }[plotVar]
         except KeyError:
             levels = None
@@ -1437,6 +1455,33 @@ def plotmultizonregmean(dsDict,
         colInds = [0, 1, 2]*3
         rowInds = np.repeat(range(3), 3)
 
+    elif len(plotIdList) == 4:
+        # Set figure window size
+        hf.set_size_inches(16.25, 7.75, forward=True)
+
+        if gsEdges is None:
+            # Edges of gridspec's outermost axes [L, R, B, T]
+            gsEdges = [0.04, 0.97, 0.07, 0.97]
+
+        # Set up subplots
+        gs = gridspec.GridSpec(2, 3,
+                               left=gsEdges[0],
+                               right=gsEdges[1],
+                               bottom=gsEdges[2],
+                               top=gsEdges[3],
+                               height_ratios=[1, 1],
+                               hspace=0.25,
+                               width_ratios=[30, 30, 1],
+                               wspace=0.15)
+
+        # Set gridspec colorbar location
+        cbColInd = 2
+        cbRowInd = 0
+
+        # Set gridspec index order
+        colInds = [0, 1]*3
+        rowInds = np.repeat(range(2), 2)
+
     # Plot hovmollers
     for jSet, plotId in enumerate(plotIdList):
         plt.subplot(gs[rowInds[jSet], colInds[jSet]])
@@ -1586,5 +1631,211 @@ def plotmultizonregmean(dsDict,
         mwp.savefig(saveDir + saveFile,
                     shape=np.array([fx, fy]))
         plt.close('all')
+
+
+def plotmultizonregmeanlines(dsDict,
+                             plotIdList,
+                             plotVar,
+                             colorDict=None,
+                             diff_flag=False,
+                             diffIdList=None,
+                             diffDs=None,
+                             diffVar=None,
+                             fontSize=12,
+                             gsEdges=None,  # list [L, R, B, T]
+                             latLim=np.array([-30, 30]),
+                             latlbls=None,
+                             legend_flag=True,
+                             levels=None,
+                             lonLim=np.array([120, 270]),
+                             lonlbls=None,
+                             lw=2,
+                             obsDs=None,
+                             obsVar=None,
+                             ocnOnly_flag=False,
+                             plotLatLim=None,
+                             plotObs_flag=False,
+                             save_flag=False,
+                             saveDir=None,
+                             stampDate_flag=False,
+                             stdUnits_flag=True,
+                             subFigCountStart='a',
+                             **kwargs
+                             ):
+    """
+    Plot lines of time mean, zonal means from multiple cases for comparison
+
+    Version Date:
+        2017-10-31
+    """
+
+    # Set lat/lon labels
+    if latlbls is None:
+        latlbls = mwp.getlatlbls(latLim)
+
+    # Ensure diffIdList or diffDs provided if diff_flag
+    if all([diff_flag, (diffIdList is None), (diffDs is None)]):
+        raise ValueError('diffIdList or diffDs must be provided to plot' +
+                         'differences')
+
+    # Set variable for differencing; assumes plotVar if not provided
+    if diffVar is None:
+        diffVar = plotVar
+
+    # Set obs properties
+    if all([plotObs_flag, obsVar is None]):
+        obsVar = {'PRECT': 'precip',
+                  }[plotVar]
+
+    # Set limits for x axis
+    if plotLatLim is None:
+        plotLatLim = latLim
+
+    # Create figure for plotting
+    hf = plt.figure()
+
+    # Set figure window size
+    hf.set_size_inches(10, 3.5, forward=True)
+
+    if gsEdges is None:
+        # Edges of gridspec's outermost axes [L, R, B, T]
+        # gsEdges = [0.04, 0.97, 0.07, 0.97]
+        gsEdges = [0.04, 0.97, 0.07, 0.97]
+
+    # Set up subplots
+    gs = gridspec.GridSpec(1, 2,
+                           left=gsEdges[0],
+                           right=gsEdges[1],
+                           bottom=gsEdges[2],
+                           top=gsEdges[3],
+                           # height_ratios=[1, 1],
+                           hspace=0.25,
+                           width_ratios=[5, 1],
+                           wspace=0.15,
+                           )
+
+    # Set gridspec legend location
+    # legColInd = 1
+    # legRowInd = 0
+
+    # Plot lines
+    plt.subplot(gs[0, 0])
+    for jSet, plotId in enumerate(plotIdList):
+        # Compute zonal mean
+        zonMeanDa = mwfn.calcdaregzonmean(dsDict[plotId][plotVar],
+                                          gwDa=(dsDict[plotId]['gw']
+                                                if 'gw' in dsDict[plotId]
+                                                else None),
+                                          latLim=latLim,
+                                          lonLim=lonLim,
+                                          ocnOnly_flag=ocnOnly_flag,
+                                          qc_flag=False,
+                                          landFracDa=(
+                                              dsDict[plotId]['LANDFRAC']
+                                              if 'LANDFRAC' in dsDict[plotId]
+                                              else None),
+                                          stdUnits_flag=stdUnits_flag,
+                                          )
+
+        try:
+            lineColor = colorDict[plotId]
+        except (KeyError, TypeError):
+            lineColor = None
+
+        plt.plot(zonMeanDa.lat, zonMeanDa.mean(dim='time'),
+                 color=lineColor,
+                 label=plotId,
+                 lw=lw)
+
+    if plotObs_flag:
+        zonMeanObsDa = mwfn.calcdaregzonmean(obsDs[obsVar],
+                                             gwDa=None,
+                                             latLim=latLim,
+                                             lonLim=lonLim,
+                                             ocnOnly_flag=ocnOnly_flag,
+                                             qc_flag=False,
+                                             landFracDa=None,
+                                             stdUnits_flag=stdUnits_flag,
+                                             )
+        try:
+            lineColor = colorDict['obs']
+        except (KeyError, TypeError):
+            lineColor = [0, 0, 0]
+
+        plt.plot(zonMeanObsDa.lat, zonMeanObsDa.mean(dim='time'),
+                 color=lineColor,
+                 label='obs',
+                 lw=lw)
+
+    # Add longitude limits
+    ax = plt.gca()
+    ax.annotate(r'$\theta$=[{:0d}, {:0d}]'.format(lonLim[0],
+                                                  lonLim[-1]),
+                xy=(1, 1),
+                xycoords='axes fraction',
+                horizontalalignment='right',
+                verticalalignment='bottom'
+                )
+
+    # Dress axes
+    plt.xlim(plotLatLim)
+    plt.xlabel('Latitude')
+    plt.ylabel('{:s} ({:s})'.format(mwp.getplotvarstring(plotVar),
+                                    zonMeanObsDa.units))
+
+    # Add legend
+    if legend_flag:
+
+        # Create legend and set position
+        plt.legend(  # hl, lName,
+                   bbox_to_anchor=(1.05, 0.5), loc=6, borderaxespad=1.)
+
+    # Add date of figure creation if requested
+    if stampDate_flag:
+        mwp.stampdate(x=1, y=0)
+
+    # Save figure if requested
+    if save_flag:
+
+        # Set directory for saving
+        if saveDir is None:
+            saveDir = os.path.dirname(os.path.realpath(__file__))
+
+        # Set file name for saving
+        if diff_flag:
+            if all([diffIdList[j] == diffIdList[0]
+                    for j in range(len(diffIdList))]):
+                diffStr = 'd' + diffIdList[0][plotVar].srcid + '_'
+            else:
+                diffStr = ''
+
+            saveFile = ('d' + plotVar +
+                        '_latlon_comp{:d}_'.format(len(plotIdList)) +
+                        diffStr + '_' +
+                        mwp.getlatlimstring(latLim, '') + '_' +
+                        mwp.getlonlimstring(lonLim, '')
+                        )
+        else:
+            if len(plotIdList) > 3:
+                caseSaveString = 'comp{:d}'.format(len(plotIdList))
+            else:
+                caseSaveString = '_'.join([plotIdList])
+            saveFile = (
+                plotVar + '_zonmeanlines_' +
+                caseSaveString + '_' +
+                mwp.getlatlimstring(latLim, '') + '_' +
+                mwp.getlonlimstring(lonLim, '')
+                )
+
+        # Set saved figure size (inches)
+        fx = hf.get_size_inches()[0]
+        fy = hf.get_size_inches()[1]
+
+        # Save figure
+        print(saveDir + saveFile)
+        mwp.savefig(saveDir + saveFile,
+                    shape=np.array([fx, fy]))
+        plt.close('all')
+
 
 # %%Do other stuff

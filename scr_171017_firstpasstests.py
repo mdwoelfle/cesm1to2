@@ -28,6 +28,7 @@ from mdwtools import mdwplots as mwp  # For plotting things
 
 import cesm1to2plotter as c1to2p
 
+import os  # operating system things.
 # import matplotlib.cm as cm
 # from scipy.stats import linregress
 
@@ -139,30 +140,32 @@ if __name__ == '__main__':
 
     # Set options/flags
     diff_flag = False
-    loadErai_flag = True  # True to load ERAI fields
-    loadGpcp_flag = True
+    loadErai_flag = False  # True to load ERAI fields
+    loadGpcp_flag = False
     loadHadIsst_flag = False
     mp_flag = True  # True to use multiprocessing when regridding
     obs_flag = False
     ocnOnly_flag = True  # Need to implement to confirm CTindex is right.
-    plotBiasRelation_flag = False
-    plotObsMap_flag = False
-    plotOneMap_flag = False
-    plotPai_flag = True
-    plotMultiMap_flag = False
-    plotGpcpTest_flag = False
-    plotRegMean_flag = False
-    plotSeasonalBiasRelation_flag = False
-    plotZonRegMeanHov_flag = False
-    plotZonRegMeanLines_flag = False
     prect_flag = True
-    regridVertical_flag = False
+    regridVertical_flag = True
+    regrid2file_flag = True
     reload_flag = False
     save_flag = False
     saveSubDir = 'testfigs/'
     testPlot_flag = False
     testPlotErai_flag = False
     verbose_flag = False
+
+    plotBiasRelation_flag = False
+    plotObsMap_flag = False
+    plotOneMap_flag = True
+    plotPai_flag = False
+    plotMultiMap_flag = False
+    plotGpcpTest_flag = False
+    plotRegMean_flag = False
+    plotSeasonalBiasRelation_flag = False
+    plotZonRegMeanHov_flag = False
+    plotZonRegMeanLines_flag = False
 
     # Set new variables to compute when loading
     newVars = 'PRECT'
@@ -213,7 +216,8 @@ if __name__ == '__main__':
         load_flag = True
 
     if load_flag or reload_flag:
-        dataSets = {versionId: xr.open_mfdataset(loadFileLists[versionId])
+        dataSets = {versionId: xr.open_mfdataset(loadFileLists[versionId],
+                                                 decode_times=False)
                     for versionId in versionIds}
 
     # Compute PRECT if needed
@@ -304,36 +308,69 @@ if __name__ == '__main__':
 # %% Regrid 3D fields
 
     # Regridding with multiprocessing
-    if False:
-        # all([mp_flag,
-        #    regridVertical_flag,
-        #    any([reload_flag, load_flag])]):
+    if all([mp_flag,
+            regridVertical_flag,
+            any([reload_flag, load_flag])]):
 
         print('>> Regridding vertical levels <<')
 
         # Set new levels for regridding
         #   > Timing works out to about 30s per level per case (seems long...)
-        # 200, 300, 400, 500, 600, 700, 775, 850, 900, 950]),
+        # 200, 300, 400, 500, 600, 675, 750, 800, 850, 900, 950, 1000]),
         newLevs = np.array([200, 300, 400, 500, 600, 675,
-                            750, 800, 850, 900, 950, 990])
-        regridVars = ['V', 'OMEGA', 'T']  # , 'V', 'OMEGA']
+                            750, 800, 850, 900, 950, 1000])
+        regridVars = ['V', 'OMEGA', 'RELHUM', 'CLOUD']  # 'T', 'U']
         regridStartTime = datetime.datetime.now()
         print(regridStartTime.strftime('--> Regrid start time: %X'))
 
-        for jVar, regridVar in enumerate(regridVars):  # = 'U'
-            print('--> Regridding {:s}'.format(regridVar))
+        # Set flag to tell if need to redo regridding
+        need2regrid_flag = False
+        regridIds = []
+
+        # First attempt to load each case from file
+        #   add cases to list to be regridded as they fail certain checks
+        dataSets_rg = dict()
+        for versionId in versionIds:
+            # Attempt to load previously regridded case from file
+            try:
+                ncFile = (ncDir +
+                          fileBaseDict[versionId] + '/' +
+                          ncSubDir +
+                          '3dregrid/' +
+                          fileBaseDict[versionId] +
+                          '.plevs.nc')
+                dataSets_rg[versionId] = xr.open_dataset(ncFile)
+            except OSError:
+                regridIds.append(versionId)
+                continue
+
+            # Ensure all requested variables are present
+            if not all([x in dataSets_rg[versionId].data_vars
+                        for x in regridVars]):
+                regridIds.append(versionId)
+                continue
+
+            # Check if all requested levels are present
+            if not all([x in dataSets_rg[versionId]['plev'].values
+                        for x in newLevs]):
+                regridIds.append(versionId)
+                continue
+
+        # Perform regridding if cannot load appropriate regridded cases from
+        #   previously regridded files
+        if regridIds:
+
+            # Start timing clock
             startTime = datetime.datetime.now()
 
             # Regrid 3D variables using multiprocessing
             #  Parallelizing over cases(?)
             mpPool = mp.Pool(8)
 
-            # Get list of cases for unpacking later
-            versionIds = versionIds
-
             # Load all datasets to memory to enable multiprocessing
-            for vid in versionIds:
-                dataSets[vid][regridVar].load()
+            for vid in regridIds:
+                for regridVar in regridVars:
+                    dataSets[vid][regridVar].load()
                 dataSets[vid]['PS'].load()
                 dataSets[vid]['hyam'].load()
                 dataSets[vid]['hybm'].load()
@@ -341,19 +378,30 @@ if __name__ == '__main__':
 
             # Create input tuple for regridding to pressure levels
             mpInList = [(dataSets[vid],
-                         regridVar,
+                         regridVars,
                          newLevs,
-                         'cesm')
-                        for vid in versionIds]
+                         {'hCoeffs': {
+                             'hyam': dataSets[vid]['hyam'].mean(
+                                 dim='time').values,
+                             'hybm': dataSets[vid]['hybm'].mean(
+                                 dim='time').values,
+                             'P0': dataSets[vid]['P0'].values[0]},
+                          'modelid': 'cesm',
+                          'psVar': 'PS',
+                          'verbose_flag': False}
+                         )
+                        for vid in regridIds]
 
             # Call multiprocessing of regridding
             # regriddedVars = mpPool.map(mwfn.regriddssigmatopres_mp,
             #                            mpInList)
-            regriddedVars = mpPool.map_async(mwfn.regriddssigmatopres_mp,
-                                             mpInList)
+            # regriddedVars = mpPool.map_async(mwfn.regriddssigmatopres_mp,
+            #                                 mpInList)
+            dsOut = mpPool.map_async(mwfn.convertsigmatopresds_mp,
+                                     mpInList)
 
             # Close multiprocessing pool
-            regriddedVars = regriddedVars.get()
+            dsOut = dsOut.get()
             mpPool.close()
             mpPool.terminate()  # Not proper,
             #                   #    but may be needed to work properly
@@ -364,244 +412,158 @@ if __name__ == '__main__':
             print(datetime.datetime.now() - startTime)
             print('##------------------------------##\n')
 
-            # Unpack regriddedVars
-            if jVar == 0:
-                dataSets_rg = dict()
-                for jVid, vid in enumerate(versionIds):
-                    dataSets_rg[vid] = \
-                        regriddedVars[jVid].to_dataset(name=regridVar)
-                    dataSets_rg[vid].attrs['id'] = regriddedVars[jVid].id
-            else:
-                for jVid, vid in enumerate(versionIds):
-                    dataSets_rg[vid] = xr.merge(
-                        [dataSets_rg[vid],
-                         regriddedVars[jVid].to_dataset(name=regridVar)])
-                    dataSets_rg[vid].attrs['id'] = regriddedVars[jVid].id
+            # Convert dsOut from list of datasets to dictionary of datasets
+            dataSets_rg = {dsOut[j].id: dsOut[j]
+                           for j in range(len(dsOut))}
 
-        # Write out total time required to do regridding
-        print('\n-->Total regrid time:')
-        print(datetime.datetime.now() - regridStartTime)
-        print('\n')
+            # Write regridded datasets to file for quick future reloading.
+            if regrid2file_flag:
+                for versionId in regridIds:
 
-    elif False:  # all([regridVertical_flag,
-        #      any([reload_flag, load_flag])]):
-        """
-        DEPRECATED
-        """
-        raise NotImplementedError('This code should never be run. Too slow.')
-        startTime = datetime.datetime.now()
-        # Set levels for regridding
-        newLevs = np.array([800, 900])
+                    # Set directory for saving netcdf file of regridded output
+                    threeDdir = (ncDir + fileBaseDict[versionId] + '/' +
+                                 ncSubDir +
+                                 '3dregrid/')
+                    # Set filename for saving netcdf file of regridded output
+                    threeDfile = (fileBaseDict[versionId] +
+                                  '.plevs_new.nc')
 
-        # Set variable to regrid
-        regridVar = 'U'
+                    # Create directory if needed
+                    if not os.path.exists(threeDdir):
+                        os.makedirs(threeDdir)
 
-        # Regrid dataarray
-        # Benchmark for timing
-        newDas = dict()
-        for vid in versionIds:
-            print('---Processing {:s}---'.format(vid))
-            newDas[vid] = mwfn.regriddssigmatopres(dataSets[vid],
-                                                   regridVar,
-                                                   newLevs,
-                                                   modelId='cesm',
-                                                   verbose_flag=True)
+                    # Save netcdf file if possible
+                    try:
+                        if os.path.exists(threeDdir + threeDfile):
+                            dataSets_rg[versionId].to_netcdf(
+                                path=threeDdir + threeDfile,
+                                mode='a')
+                        else:
+                            dataSets_rg[versionId].to_netcdf(
+                                path=threeDdir + threeDfile,
+                                mode='w')
+                    except ValueError:
+                        raise ValueError('probably related to datetime.')
 
-        print('\n##------------------------------##')
-        print('Time to regrid with loop:')
-        print(datetime.datetime.now() - startTime)
-        print('##------------------------------##\n')
-
-# %% Regrid 3D fields -- NEW
-
-    # Regridding with multiprocessing
-    if all([mp_flag,
-            regridVertical_flag,
-            any([reload_flag, load_flag])]):
-
-        print('>> Regridding vertical levels22 <<')
-
-        # Set new levels for regridding
-        #   > Timing works out to about 30s per level per case (seems long...)
-        # 200, 300, 400, 500, 600, 700, 775, 850, 900, 950]),
-        newLevs = np.array([200, 300, 400, 500, 600, 675,
-                            750, 800, 850, 900, 950, 990
-                            ])
-        regridVars = ['V', 'OMEGA', 'T']  # , 'V', 'OMEGA']
-        regridStartTime = datetime.datetime.now()
-        print(regridStartTime.strftime('--> Regrid start time: %X'))
-
-        startTime = datetime.datetime.now()
-
-        # Regrid 3D variables using multiprocessing
-        #  Parallelizing over cases(?)
-        mpPool = mp.Pool(8)
-
-        # Get list of cases for unpacking later
-        versionIds = versionIds
-
-        # Load all datasets to memory to enable multiprocessing
-        for vid in versionIds:
-            for regridVar in regridVars:
-                dataSets[vid][regridVar].load()
-            dataSets[vid]['PS'].load()
-            dataSets[vid]['hyam'].load()
-            dataSets[vid]['hybm'].load()
-            dataSets[vid]['P0'].load()
-
-        # Create input tuple for regridding to pressure levels
-        mpInList = [(dataSets[vid],
-                     regridVars,
-                     newLevs,
-                     {'hCoeffs': {
-                         'hyam': dataSets[vid]['hyam'].mean(dim='time').values,
-                         'hybm': dataSets[vid]['hybm'].mean(dim='time').values,
-                         'P0': dataSets[vid]['P0'].values[0]},
-                      'modelid': 'cesm',
-                      'psVar': 'PS',
-                      'verbose_flag': False}
-                     )
-                    for vid in versionIds]
-
-        # Call multiprocessing of regridding
-        # regriddedVars = mpPool.map(mwfn.regriddssigmatopres_mp,
-        #                            mpInList)
-        # regriddedVars = mpPool.map_async(mwfn.regriddssigmatopres_mp,
-        #                                 mpInList)
-        dsOut = mpPool.map_async(mwfn.convertsigmatopresds_mp,
-                                 mpInList)
-
-        # Close multiprocessing pool
-        dsOut = dsOut.get()
-        mpPool.close()
-        mpPool.terminate()  # Not proper,
-        #                   #    but may be needed to work properly
-        mpPool.join()
-
-        print('\n##------------------------------##')
-        print('Time to regrid with mp:')
-        print(datetime.datetime.now() - startTime)
-        print('##------------------------------##\n')
-
-        # Convert dsOut from list of datasets to dictionary of datasets
-        dataSets_rg = {dsOut[j].id: dsOut[j]
-                       for j in range(len(dsOut))}
 
 # %% Plot one map
 
     # set plotting parameters
     latLim = np.array([-30, 30])
-    lonLim = np.array([119.5, 270.5])
+    # lonLim = np.array([119.5, 290.5])
+    lonLim = np.array([0, 360])
 
     latLbls = np.arange(-30, 31, 10)
     lonLbls = np.arange(120, 271, 30)
 
-    tSteps = np.arange(1, 5)
+    tSteps = np.arange(0, 12)
 
     if plotOneMap_flag:
 
-        plotVar = 'PRECT'
-        plev = 200
-        diffPlev = plev
-        diff_flag = True  # False
-        # plotCase = ''  # '125'
-        # diffCase = 'ga7.66'  # '119'
-        plotCase, diffCase = [['ga7.66', '36'],
-                              ['119', 'ga7.66'],
-                              ['125', '119'],
-                              ['125', '36']][3]
-        quiver_flag = True
-        uVar = 'TAUX'
-        vVar = 'TAUY'
+        for plotVar in ['FSNS']:
+            plev = 900
+            diffPlev = plev
+            diff_flag = True  # False
+            # plotCase = ''  # '125'
+            # diffCase = 'ga7.66'  # '119'
+            plotCase, diffCase = [['ga7.66', '36'],
+                                  ['119', '36'],
+                                  ['125', '119'],
+                                  ['125', '36']][3]
+            ocnOnly_flag = False
+            quiver_flag = False
+            uVar = 'TAUX'
+            vVar = 'TAUY'
 
-        # Ensure dataSets_rg exists
-        try:
-            dataSets_rg[plotCase]
-        except NameError:
-            dataSets_rg = {jCase: ['foo', 'bar']
-                           for jCase in list(dataSets.keys())}
-        except KeyError:
-            dataSets_rg = {jCase: ['foo', 'bar']
-                           for jCase in list(dataSets.keys())}
+            # Ensure dataSets_rg exists
+            try:
+                dataSets_rg[plotCase]
+            except NameError:
+                dataSets_rg = {jCase: ['foo', 'bar']
+                               for jCase in list(dataSets.keys())}
+            except KeyError:
+                dataSets_rg = {jCase: ['foo', 'bar']
+                               for jCase in list(dataSets.keys())}
 
-        # Create figure for plotting
-        hf = plt.figure()
+            # Create figure for plotting
+            hf = plt.figure()
 
-        # Get quiver properties
-        quiverProps = getquiverprops(uVar, vVar, plev,
-                                     diff_flag=diff_flag)
+            # Get quiver properties
+            quiverProps = getquiverprops(uVar, vVar, plev,
+                                         diff_flag=diff_flag)
 
-        # Plot some fields for comparison
-        c1to2p.plotlatlon((dataSets_rg[plotCase]
-                           if plotVar in dataSets_rg[plotCase]
-                           else dataSets[plotCase]),  # hadIsstDs
-                          plotVar,
-                          box_flag=False,
-                          boxLat=np.array([-3, 3]),
-                          boxLon=np.array([180, 220]),
-                          caseString=None,
-                          cbar_flag=True,
-                          # cbar_dy=0.001,
-                          cbar_height=0.02,
-                          cMap=None,  # 'RdBu_r',
-                          compcont_flag=True,
-                          diff_flag=diff_flag,
-                          diffDs=(dataSets_rg[diffCase]
-                                  if plotVar in dataSets_rg[diffCase]
-                                  else dataSets[diffCase]),  # gpcpClimoDs,
-                          diffPlev=diffPlev,
-                          fontSize=12,
-                          latLim=np.array([-20, 20]),
-                          levels=None,  # np.arange(-15, 15.1, 1.5),
-                          lonLim=np.array([119.5, 270.5]),
-                          plev=plev,
-                          quiver_flag=quiver_flag,
-                          quiverDs=(dataSets_rg[plotCase]
-                                    if uVar in dataSets_rg[plotCase]
-                                    else dataSets[plotCase]),
-                          quiverDiffDs=(dataSets_rg[diffCase]
-                                        if uVar in dataSets_rg[diffCase]
-                                        else dataSets[diffCase]),
-                          quiverNorm_flag=False,
-                          quiverScale=quiverProps['quiverScale'],
-                          quiverScaleVar=None,
-                          rmRegMean_flag=False,
-                          stampDate_flag=False,
-                          tSteps=tSteps,
-                          tStepLabel_flag=True,
-                          uRef=quiverProps['uRef'],
-                          uVar=uVar,
-                          vVar=vVar,
-                          )
-        # Save figure if requested
-        if save_flag:
-            # Set directory for saving
-            if saveDir is None:
-                saveDir = setfilepaths()[2]
+            # Plot some fields for comparison
+            c1to2p.plotlatlon((dataSets_rg[plotCase]
+                               if plotVar in dataSets_rg[plotCase]
+                               else dataSets[plotCase]),  # hadIsstDs
+                              plotVar,
+                              box_flag=False,
+                              boxLat=np.array([-3, 3]),
+                              boxLon=np.array([180, 220]),
+                              caseString=None,
+                              cbar_flag=True,
+                              # cbar_dy=0.001,
+                              cbar_height=0.02,
+                              cMap=None,  # 'RdBu_r',
+                              compcont_flag=True,
+                              diff_flag=diff_flag,
+                              diffDs=(dataSets_rg[diffCase]
+                                      if plotVar in dataSets_rg[diffCase]
+                                      else dataSets[diffCase]),  # gpcpClimoDs,
+                              diffPlev=diffPlev,
+                              fontSize=12,
+                              latLim=latLim,
+                              levels=None,  # np.arange(-15, 15.1, 1.5),
+                              lonLim=lonLim,
+                              ocnOnly_flag=ocnOnly_flag,
+                              plev=plev,
+                              quiver_flag=quiver_flag,
+                              quiverDs=(dataSets_rg[plotCase]
+                                        if uVar in dataSets_rg[plotCase]
+                                        else dataSets[plotCase]),
+                              quiverDiffDs=(dataSets_rg[diffCase]
+                                            if uVar in dataSets_rg[diffCase]
+                                            else dataSets[diffCase]),
+                              quiverNorm_flag=False,
+                              quiverScale=quiverProps['quiverScale'],
+                              quiverScaleVar=None,
+                              rmRegMean_flag=False,
+                              stampDate_flag=False,
+                              tSteps=tSteps,
+                              tStepLabel_flag=True,
+                              uRef=quiverProps['uRef'],
+                              uVar=uVar,
+                              vVar=vVar,
+                              )
+            # Save figure if requested
+            if save_flag:
+                # Set directory for saving
+                if saveDir is None:
+                    saveDir = setfilepaths()[2]
 
-            # Set file name for saving
-            tString = 'mon'
-            saveFile = (('d' if diff_flag else '') +
-                        plotVar +
-                        '{:d}'.format(plev) +
-                        '_latlon_' +
-                        tString +
-                        '{:03.0f}'.format(tSteps[0]) + '-' +
-                        '{:03.0f}'.format(tSteps[-1]))
+                # Set file name for saving
+                tString = 'mon'
+                saveFile = (('d' if diff_flag else '') +
+                            plotVar +
+                            '{:d}'.format(plev) +
+                            '_latlon_' +
+                            tString +
+                            '{:03.0f}'.format(tSteps[0]) + '-' +
+                            '{:03.0f}'.format(tSteps[-1]))
 
-            # Set saved figure size (inches)
-            fx, fy = hf.get_size_inches()
+                # Set saved figure size (inches)
+                fx, fy = hf.get_size_inches()
 
-            # Save figure
-            print(saveDir + saveFile)
-            mwp.savefig(saveDir + saveSubDir + saveFile,
-                        shape=np.array([fx, fy]))
-            plt.close('all')
+                # Save figure
+                print(saveDir + saveFile)
+                mwp.savefig(saveDir + saveSubDir + saveFile,
+                            shape=np.array([fx, fy]))
+                plt.close('all')
 
 # %% Plot map of obs
 
     if plotObsMap_flag:
-        plotVar = 'OMEGA'
+        plotVar = 'PRECT'
         uVar = 'U'
         vVar = 'V'
         plev = 200
@@ -617,8 +579,14 @@ if __name__ == '__main__':
         quiverProps = getquiverprops(uVar, vVar, plev,
                                      diff_flag=diff_flag)
 
-        obsDs = {'OMEGA': erai3dDs}[plotVar]
-        obsVar = {'OMEGA': 'w'}[plotVar]
+        obsDs = {'OMEGA': erai3dDs,
+                 'PRECT': gpcpClimoDs,
+                 'TS': hadIsstDs,
+                 }[plotVar]
+        obsVar = {'OMEGA': 'w',
+                  'PRECT': 'precip',
+                  'TS': 'sst',
+                  }[plotVar]
         obsQDs = {'U': erai3dDs}[uVar]
         obsUVar = {'U': 'u'}[uVar]
         obsVVar = {'V': 'v'}[vVar]
@@ -641,9 +609,9 @@ if __name__ == '__main__':
                           #        else dataSets[diffCase]),  # gpcpClimoDs,
                           # diffPlev=diffPlev,
                           fontSize=12,
-                          latLim=np.array([-20, 20]),
+                          latLim=latLim,  # np.array([-20, 20]),
                           levels=None,  # np.arange(-15, 15.1, 1.5),
-                          lonLim=np.array([119.5, 270.5]),
+                          lonLim=lonLim,  # np.array([119.5, 270.5]),
                           plev=plev,
                           quiver_flag=False,  # True,
                           quiverDs=obsQDs,
@@ -700,7 +668,7 @@ if __name__ == '__main__':
 
 # %% Plot multiple maps
     if plotMultiMap_flag:
-        plotVars = ['U10']
+        plotVars = ['TS']
         for plotVar in plotVars:
             c1to2p.plotmultilatlon(dataSets,
                                    versionIds,
@@ -1140,7 +1108,7 @@ if __name__ == '__main__':
     if plotPai_flag:
 
         # Set name of index to plot
-        indexName = 'PAI'
+        indexName = 'pcent'
         plotVar = None
 
         # Set plotting flags and specifications
@@ -1174,10 +1142,20 @@ if __name__ == '__main__':
             obsVar = 'precip'
             ocnOnly_flag = False
             title = 'Precipitation Asymmetry Index'
+        elif indexName.lower() in ['pcent']:
+            ds = dataSets
+            yLim = np.array([-10, 10])
+            yLim_annMean = np.array([-5, 5])
+            plotObs_flag = True
+            obsDs = gpcpDs
+            obsVar = 'precip'
+            ocnOnly_flag = False
+            title = 'Precipitation Centroid'
 
         if plotVar is None:
             plotVar = {'ditcz': 'PRECT',
                        'pai': 'PRECT',
+                       'pcent': 'PRECT',
                        }[indexName.lower()]
 
         # Create dictionary to hold annual mean value (and colors)
@@ -1661,19 +1639,26 @@ if __name__ == '__main__':
 # %% Plot pressure-latitude figure with vectors (potentially)
 
     if testPlot_flag:
-        # Set variable to plot
-        plotVar = 'V'
+        # Set variable to plot with colored contours
+        plotVar = 'CLOUD'
         plotCase = '125'
         diffCase = '119'
         diff_flag = True
+
+        # Set variable to plot with black contours
+        contVar = 'RELHUM'
+        contCase = plotCase
+        dcontCase = diffCase
+        dcont_flag = diff_flag
+
         quiver_flag = True
-        # save_flag = True
+        # save_flag = False
 
         # Set plotting limits
         latLim = np.array([-20, 20])
         lonLim = np.array([210, 260])
-        pLim = np.array([1000, 200])
-        tLim = np.array([1, 5])
+        pLim = np.array([1000, 400])
+        tLim = np.array([0, 2])  # exclusive of end pt.
         dt = 1
 
         # Compute meridional mean over requested longitudes
@@ -1690,32 +1675,66 @@ if __name__ == '__main__':
         a = a.isel(time=slice(tLim[0], tLim[-1], dt)).mean(dim='time')
         b = b.isel(time=slice(tLim[0], tLim[-1], dt)).mean(dim='time')
 
-        # Get contours for plotting
+        # Get contours for plotting filled contours
         try:
             if diff_flag:
-                conts = {'T': np.arange(-2, 2.1, 0.2),
-                         'V': np.arange(-3, 3.1, 0.3),
-                         }[plotVar]
+                colorConts = {'CLOUD': np.arange(-0.2, 0.201, 0.02),
+                              'RELHUM': np.arange(-20, 20.1, 2),
+                              'T': np.arange(-2, 2.1, 0.2),
+                              'V': np.arange(-3, 3.1, 0.3),
+                              }[plotVar]
             else:
-                conts = {'T': np.arange(225, 295.1, 5),
-                         'V': np.arange(-4, 4.1, 0.5),
-                         'Z3': np.arange(0, 15001, 1000),
-                         }[plotVar]
+                colorConts = {'CLOUD': np.arange(0, 0.301, 0.02),
+                              'RELHUM': np.arange(0, 100.1, 5),
+                              'T': np.arange(225, 295.1, 5),
+                              'V': np.arange(-4, 4.1, 0.5),
+                              'Z3': np.arange(0, 15001, 1000),
+                              }[plotVar]
         except KeyError:
             conts = None
+
+        # Get contours for plotting lined contours
+        try:
+            if diff_flag:
+                lineConts = {'CLOUD': np.arange(-0.2, 0.201, 0.02),
+                             'RELHUM': np.arange(-20, 20.1, 2),
+                             'T': np.arange(-2, 2.1, 0.2),
+                             'V': np.arange(-3, 3.1, 0.3),
+                             }[contVar]
+            else:
+                lineConts = {'CLOUD': np.arange(0, 0.301, 0.05),
+                             'RELHUM': np.arange(0, 100.1, 10),
+                             'T': np.arange(225, 295.1, 10),
+                             'V': np.arange(-4, 4.1, 0.5),
+                             'Z3': np.arange(0, 15001, 1500),
+                             }[contVar]
+        except KeyError:
+            lineConts = None
 
         # Create figure for plotting
         hf = plt.figure()
 
-        # Plot meridional mean slice
+        # Plot meridional mean slice with filled contours
         cset1 = plt.contourf(a['lat'],
                              a['plev'],
                              a[plotVar] -
                              (b[plotVar] if diff_flag
                               else 0),
-                             conts,
-                             cmap='RdBu_r',
+                             colorConts,
+                             cmap=mwp.getcmap(plotVar,
+                                              diff_flag=diff_flag),
                              extend='both')
+
+        # Plot meridional mean slice with black contours
+        if contVar is not None:
+            cset2 = plt.contour(a['lat'],
+                                a['plev'],
+                                a[contVar] -
+                                (b[contVar] if diff_flag
+                                 else 0),
+                                lineConts,
+                                colors='k')
+            plt.clabel(cset2)  # , fontsize=9)
 
         # Compute w
         if quiver_flag:
@@ -1780,7 +1799,7 @@ if __name__ == '__main__':
                     verticalalignment='bottom')
 
         # Add time range
-        tStepString = 't = [{:0d}, {:0d}]'.format(tLim[0], tLim[-1])
+        tStepString = 't = [{:0d}, {:0d}]'.format(tLim[0], tLim[-1]-1)
         ax.annotate(tStepString,
                     xy=[1, 1],
                     xycoords='axes fraction',
@@ -1796,7 +1815,7 @@ if __name__ == '__main__':
             # Set filename for saving
             saveFile = (('d' if diff_flag else '') +
                         plotVar +
-                        ('_UW' if quiver_flag else '') +
+                        ('_VW' if quiver_flag else '') +
                         '_' + plotCase +
                         ('-{:s}'.format(diffCase) if diff_flag else '') +
                         '_' + mwp.getlatlimstring(latLim, '') +
@@ -1810,24 +1829,24 @@ if __name__ == '__main__':
 
             # Save figure
             print(saveDir + saveFile)
-            # mwp.savefig(saveDir + saveFile,
-            #             shape=np.array([fx, fy]))
-            # plt.close('all')
+            mwp.savefig(saveDir + saveFile,
+                        shape=np.array([fx, fy]))
+            plt.close('all')
 
     # %% Plot meridional slices of obs
     # Plot observed meridional slice
     if testPlotErai_flag:  # all([testPlot_flag,
         #    loadErai_flag]):
         # Set variable to plot
-        plotVar = 't'
+        plotVar = 'r'
         quiver_flag = True
-        save_flag = False
+        save_flag = True
 
         # Set plotting limits
         latLim = np.array([-20, 20])
         lonLim = np.array([210, 260])
         pLim = np.array([1000, 200])
-        # tLim = np.array([1, 5])
+        tLim = np.array([7, 12])
         dt = 1
 
         # Compute meridional mean over requested longitudes
@@ -1841,7 +1860,8 @@ if __name__ == '__main__':
 
         # Get contours for plotting
         try:
-            conts = {'t': np.arange(225, 295.1, 5),
+            conts = {'r': np.arange(0, 100.1, 5),
+                     't': np.arange(225, 295.1, 5),
                      'u': np.arange(-24, 24.1, 2),
                      'V': np.arange(-4, 4.1, 0.5),
                      'Z3': np.arange(0, 15001, 1000),
@@ -1857,7 +1877,7 @@ if __name__ == '__main__':
                              a['plev'],
                              a[plotVar],
                              conts,
-                             cmap='RdBu_r',
+                             cmap=mwp.getcmap(plotVar),
                              extend='both')
 
         # Compute w
@@ -1917,7 +1937,7 @@ if __name__ == '__main__':
                     verticalalignment='bottom')
 
         # Add time range
-        tStepString = 't = [{:0d}, {:0d}]'.format(tLim[0], tLim[-1])
+        tStepString = 't = [{:0d}, {:0d}]'.format(tLim[0], tLim[-1]-1)
         ax.annotate(tStepString,
                     xy=[1, 1],
                     xycoords='axes fraction',
@@ -1933,8 +1953,8 @@ if __name__ == '__main__':
             # Set filename for saving
             saveFile = (('d' if diff_flag else '') +
                         plotVar +
-                        ('_UW' if quiver_flag else '') +
-                        '_' + plotCase +
+                        ('_VW' if quiver_flag else '') +
+                        '_' + 'erai' +
                         ('-{:s}'.format(diffCase) if diff_flag else '') +
                         '_' + mwp.getlatlimstring(latLim, '') +
                         '_' + mwp.getlonlimstring(lonLim, '') +

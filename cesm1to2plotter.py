@@ -57,6 +57,8 @@ def calcregmeanindex(ds,
     - dITCZ - double-ITCZ index
     - dSLP - Eq. Pacific SLP gradient (~Walker strength)
     - walker - Walker circulation index (based on pressure)
+    - pai - precipitation asymmetry index
+    - pcent - precipitation centroid
     """
 
     # Choose appropriate index to compute
@@ -128,6 +130,19 @@ def calcregmeanindex(ds,
                                              precipVar=indexVar,
                                              qc_flag=qc_flag,
                                              )
+    elif indexName.lower() in ['precipcentroid', 'precipitationcentroid',
+                               'pcent']:
+        # Assign default index if none provided
+        if indexType is None:
+            indexType = 'areaweight'
+        if indexVar is None:
+            indexVar = 'PRECT'
+
+        # Compute centroid of tropical precipitation
+        indexDa = mwfn.calcdsprecipcentroid(ds,
+                                            indexType=indexType,
+                                            precipVar=indexVar,
+                                            qc_flag=qc_flag)
     else:
         raise NameError('Cannot find function to compute ' +
                         'index: {:s}'.format(indexName))
@@ -256,7 +271,12 @@ def getmapcontlevels(plotVar,
     """
     if diff_flag:
         try:
-            levels = {'FLNS': np.arange(-30., 30.1, 3),
+            levels = {'CLDHGH': np.arange(-0.5, 0.51, 0.05),
+                      'CLDLOW': np.arange(-0.5, 0.51, 0.05),
+                      'CLDMED': np.arange(-0.5, 0.51, 0.05),
+                      'CLDTOT': np.arange(-0.5, 0.51, 0.05),
+                      'CLOUD': np.arange(-0.5, 0.51, 0.05),
+                      'FLNS': np.arange(-30., 30.1, 3),
                       # 'FNS': np.arange(-600., 600.1, 100),
                       'FNS': np.arange(-200, 200.1, 20),
                       'FSNS': np.arange(-50, 50.1, 5.),
@@ -268,7 +288,9 @@ def getmapcontlevels(plotVar,
                       'PRECL': np.arange(-10, 10.1, 1),
                       'PRECT': np.arange(-10, 10.1, 1),
                       'PS': np.arange(-4., 4.01, 0.5),
+                      'PSL': np.arange(-4, 4.01, 0.5),
                       'SHFLX': np.arange(-10, 10., 1.),
+                      'T': np.arange(-2, 2.1, 0.2),
                       'TAUX': np.arange(-0.1, 0.101, 0.01),
                       'TAUY': np.arange(-0.1, 0.101, 0.01),
                       'TS': np.arange(-2, 2.1, 0.2),
@@ -290,7 +312,12 @@ def getmapcontlevels(plotVar,
             levels = None
     else:
         try:
-            levels = {'FLNS': np.arange(0., 120.1, 10),
+            levels = {'CLDHGH': np.arange(0, 0.51, 0.025),
+                      'CLDLOW': np.arange(0, 0.51, 0.025),
+                      'CLDMED': np.arange(0, 0.51, 0.025),
+                      'CLDTOT': np.arange(0, 0.51, 0.025),
+                      'CLOUD': np.arange(0, 0.51, 0.025),
+                      'FLNS': np.arange(0., 120.1, 10),
                       'FNS': np.arange(-600., 600.1, 100),
                       'FSNS': np.arange(0, 400.1, 20.),
                       'LHFLX': np.arange(0, 200.1, 10),
@@ -302,10 +329,12 @@ def getmapcontlevels(plotVar,
                       'PRECL': np.arange(0, 20.1, 2),
                       'PRECT': np.arange(0, 20.1, 2),
                       'PS': np.arange(1004., 1013.1, 1),
+                      'PSL': np.arange(1004, 1013.1, 1),
                       'SHFLX': np.arange(0, 20., 1.),
+                      'T': np.arange(290, 305.1, 1),
                       'TAUX': np.arange(-0.2, 0.201, 0.02),
                       'TAUY': np.arange(-0.1, 0.101, 0.01),
-                      'TS': np.arange(290, 305, 1),
+                      'TS': np.arange(290, 305.1, 1),
                       'U': np.arange(-10, 10.1, 1.0),
                       'U10': np.arange(0, 10.1, 1),
                       'curlTau': np.arange(-3e-7, 3.001e-7, 3e-8),
@@ -781,6 +810,8 @@ def plotlatlon(ds,
                 diffDs[diffVar].values[diffTSteps, kPlev, :, :].mean(axis=0))
         else:
             pData = ds[plotVar].values[tSteps, jPlev, :, :].mean(axis=0)
+
+    # Filter to only values over ocean
 
     # Pull data for plotting vectors (if needed)
     if quiver_flag:

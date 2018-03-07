@@ -148,17 +148,17 @@ if __name__ == '__main__':
     ocnOnly_flag = True  # Need to implement to confirm CTindex is right.
     prect_flag = True
     regridVertical_flag = True
-    regrid2file_flag = True
+    regrid2file_flag = False
     reload_flag = False
     save_flag = False
     saveSubDir = 'testfigs/'
-    testPlot_flag = False
+    testPlot_flag = True
     testPlotErai_flag = False
     verbose_flag = False
 
     plotBiasRelation_flag = False
     plotObsMap_flag = False
-    plotOneMap_flag = True
+    plotOneMap_flag = False
     plotPai_flag = False
     plotMultiMap_flag = False
     plotGpcpTest_flag = False
@@ -319,7 +319,7 @@ if __name__ == '__main__':
         # 200, 300, 400, 500, 600, 675, 750, 800, 850, 900, 950, 1000]),
         newLevs = np.array([200, 300, 400, 500, 600, 675,
                             750, 800, 850, 900, 950, 1000])
-        regridVars = ['V', 'OMEGA', 'RELHUM', 'CLOUD']  # 'T', 'U']
+        regridVars = ['V', 'OMEGA', 'RELHUM', 'CLOUD', 'T', 'U']
         regridStartTime = datetime.datetime.now()
         print(regridStartTime.strftime('--> Regrid start time: %X'))
 
@@ -364,8 +364,9 @@ if __name__ == '__main__':
             startTime = datetime.datetime.now()
 
             # Regrid 3D variables using multiprocessing
-            #  Parallelizing over cases(?)
-            mpPool = mp.Pool(8)
+            #   Parallelizing over cases(?)
+            #   Need to be wary here to not run out of memory.
+            mpPool = mp.Pool(4)
 
             # Load all datasets to memory to enable multiprocessing
             for vid in regridIds:

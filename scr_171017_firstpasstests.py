@@ -78,14 +78,19 @@ def setfilepaths():
 
 def getcolordict():
     return {'01': '#1f77b4',
+            '28': '#ff7f0e',
+            '36': '#2ca02c',
+            'ga7.66': '#d62728',
+            '100': '#42e5f4',
+            '113': '#aff441',
+            '114': '#f441a6',
+            '116': '#41f4b2',
+            '118': '#f4b541',
             '119': '#9467bd',
             '125': '#8c564b',
             '161': '#e377c2',
             '194': '#7f7f7f',
             '195': '#bcbd22',
-            '28': '#ff7f0e',
-            '36': '#2ca02c',
-            'ga7.66': '#d62728',
             'obs': [0, 0, 0]}
 
 
@@ -140,32 +145,32 @@ if __name__ == '__main__':
 
     # Set options/flags
     diff_flag = False
-    loadErai_flag = False  # True to load ERAI fields
-    loadGpcp_flag = False
-    loadHadIsst_flag = False
+    loadErai_flag = True  # True to load ERAI fields
+    loadGpcp_flag = True
+    loadHadIsst_flag = True
     mp_flag = True  # True to use multiprocessing when regridding
     obs_flag = False
     ocnOnly_flag = True  # Need to implement to confirm CTindex is right.
     prect_flag = True
-    regridVertical_flag = True
+    regridVertical_flag = False
     regrid2file_flag = False
     reload_flag = False
     save_flag = False
-    saveSubDir = 'testfigs/'
-    testPlot_flag = True
-    testPlotErai_flag = False
+    saveSubDir = 'testfigs/66to125/'
     verbose_flag = False
 
     plotBiasRelation_flag = False
     plotObsMap_flag = False
     plotOneMap_flag = False
-    plotPai_flag = False
+    plotPai_flag = True
     plotMultiMap_flag = False
     plotGpcpTest_flag = False
     plotRegMean_flag = False
     plotSeasonalBiasRelation_flag = False
     plotZonRegMeanHov_flag = False
     plotZonRegMeanLines_flag = False
+    testPlot_flag = False
+    testPlotErai_flag = False
 
     # Set new variables to compute when loading
     newVars = 'PRECT'
@@ -175,19 +180,29 @@ if __name__ == '__main__':
 
     # Set name(s) of file(s) to load
     versionIds = ['01',
-                  '28',
-                  '36',
+                  # '28',
+                  # '36',
                   'ga7.66',
+                  '100',
+                  '113',
+                  '114',
+                  '116',
+                  '118',
                   '119',
                   '125',
-                  '161',
-                  '194',
-                  '195'
+                  # '161',
+                  # '194',
+                  # '195'
                   ]
     fileBaseDict = {'01': 'b.e15.B1850G.f09_g16.pi_control.01',
                     '28': 'b.e15.B1850G.f09_g16.pi_control.28',
                     '36': 'b.e15.B1850.f09_g16.pi_control.36',
                     'ga7.66': 'b.e15.B1850.f09_g16.pi_control.all_ga7.66',
+                    '100': 'b.e15.B1850.f09_g16.pi_control.all.100',
+                    '113': 'b.e15.B1850.f09_g16.pi_control.all.113',
+                    '114': 'b.e15.B1850.f09_g16.pi_control.all.114',
+                    '116': 'b.e15.B1850.f09_g16.pi_control.all.116',
+                    '118': 'b.e15.B1850.f09_g16.pi_control.all.118',
                     '119': 'b.e15.B1850.f09_g16.pi_control.all.119',
                     '125': 'b.e20.B1850.f09_g16.pi_control.all.125',
                     '161': 'b.e20.BHIST.f09_g17.20thC.161_01',
@@ -451,8 +466,8 @@ if __name__ == '__main__':
 
     # set plotting parameters
     latLim = np.array([-30, 30])
-    # lonLim = np.array([119.5, 290.5])
-    lonLim = np.array([0, 360])
+    lonLim = np.array([119.5, 290.5])
+    # lonLim = np.array([0, 360])
 
     latLbls = np.arange(-30, 31, 10)
     lonLbls = np.arange(120, 271, 30)
@@ -461,16 +476,18 @@ if __name__ == '__main__':
 
     if plotOneMap_flag:
 
-        for plotVar in ['FSNS']:
+        for plotVar in ['PRECT', 'TS']:
             plev = 900
             diffPlev = plev
-            diff_flag = True  # False
+            diff_flag = False  # False
             # plotCase = ''  # '125'
             # diffCase = 'ga7.66'  # '119'
             plotCase, diffCase = [['ga7.66', '36'],
                                   ['119', '36'],
+                                  ['118', 'ga7.66'],
+                                  ['119', '118'],
                                   ['125', '119'],
-                                  ['125', '36']][3]
+                                  ['125', '36']][2]
             ocnOnly_flag = False
             quiver_flag = False
             uVar = 'TAUX'
@@ -564,72 +581,84 @@ if __name__ == '__main__':
 # %% Plot map of obs
 
     if plotObsMap_flag:
-        plotVar = 'PRECT'
-        uVar = 'U'
-        vVar = 'V'
-        plev = 200
-        diffPlev = plev
-        diff_flag = False  # False
-        plotCase = '125'  # '125'
-        diffCase = '119'  # '119'
+        for plotVar in ['PRECT', 'TS']:
+            uVar = 'TAUX'
+            vVar = 'TAUY'
+            plev = 200
+            diffPlev = plev
+            diff_flag = False  # False
+            plotCase = '125'  # '125'
+            diffCase = '119'  # '119'
+            tSteps = np.arange(0, 12)
 
-        # Create figure for plotting
-        hf = plt.figure()
+            # Get quiver properties
+            quiverProps = getquiverprops(uVar, vVar, plev,
+                                         diff_flag=diff_flag)
 
-        # Get quiver properties
-        quiverProps = getquiverprops(uVar, vVar, plev,
-                                     diff_flag=diff_flag)
+            obsDs = {'OMEGA': erai3dDs,
+                     'PRECT': gpcpClimoDs,
+                     'TAUX': eraiDs,
+                     'TS': hadIsstDs,
+                     }[plotVar]
+            obsVar = {'OMEGA': 'w',
+                      'PRECT': 'precip',
+                      'TAUX': 'iews',
+                      'TS': 'sst',
+                      }[plotVar]
+            obsQuivDs = {'TAUX': eraiDs,
+                         'U': erai3dDs}[uVar]
+            obsUVar = {'TAUX': 'iews',
+                       'U': 'u',
+                       }[uVar]
+            obsVVar = {'TAUY': 'inss',
+                       'V': 'v',
+                       }[vVar]
 
-        obsDs = {'OMEGA': erai3dDs,
-                 'PRECT': gpcpClimoDs,
-                 'TS': hadIsstDs,
-                 }[plotVar]
-        obsVar = {'OMEGA': 'w',
-                  'PRECT': 'precip',
-                  'TS': 'sst',
-                  }[plotVar]
-        obsQDs = {'U': erai3dDs}[uVar]
-        obsUVar = {'U': 'u'}[uVar]
-        obsVVar = {'V': 'v'}[vVar]
-
-        # Plot some fields for comparison
-        c1to2p.plotlatlon(obsDs,  # hadIsstDs
-                          obsVar,
-                          box_flag=False,
-                          boxLat=np.array([-3, 3]),
-                          boxLon=np.array([180, 220]),
-                          caseString=None,
-                          cbar_flag=True,
-                          # cbar_dy=0.001,
-                          cbar_height=0.02,
-                          cMap=None,  # 'RdBu_r',
-                          compcont_flag=True,
-                          diff_flag=False,  # diff_flag,
-                          # diffDs=(dataSets_rg[diffCase]
-                          #        if plotVar in dataSets_rg[diffCase]
-                          #        else dataSets[diffCase]),  # gpcpClimoDs,
-                          # diffPlev=diffPlev,
-                          fontSize=12,
-                          latLim=latLim,  # np.array([-20, 20]),
-                          levels=None,  # np.arange(-15, 15.1, 1.5),
-                          lonLim=lonLim,  # np.array([119.5, 270.5]),
-                          plev=plev,
-                          quiver_flag=False,  # True,
-                          quiverDs=obsQDs,
-                          # quiverDiffDs=(dataSets_rg[diffCase]
-                          #              if uVar in dataSets_rg[diffCase]
-                          #              else dataSets[diffCase]),
-                          quiverNorm_flag=False,
-                          quiverScale=quiverProps['quiverScale'],
-                          quiverScaleVar=None,
-                          rmRegMean_flag=False,
-                          stampDate_flag=False,
-                          tSteps=tSteps,
-                          tStepLabel_flag=True,
-                          uRef=quiverProps['uRef'],
-                          uVar=obsUVar,
-                          vVar=obsVVar,
-                          )
+            # Plot some fields for comparison
+            c1to2p.plotlatlon(obsDs,  # hadIsstDs
+                              obsVar,
+                              box_flag=False,
+                              boxLat=np.array([-3, 3]),
+                              boxLon=np.array([180, 220]),
+                              caseString=None,
+                              cbar_flag=True,
+                              # cbar_dy=0.001,
+                              cbar_height=0.02,
+                              cMap=None,  # 'RdBu_r',
+                              compcont_flag=True,
+                              diff_flag=False,  # diff_flag,
+                              # diffDs=(dataSets_rg[diffCase]
+                              #        if plotVar in dataSets_rg[diffCase]
+                              #        else dataSets[diffCase]),
+                              # diffPlev=diffPlev,
+                              figDims=[6, 3.5],
+                              fontSize=12,
+                              latLim=latLim,  # np.array([-20, 20]),
+                              levels=None,  # np.arange(-15, 15.1, 1.5),
+                              lonLim=lonLim,  # np.array([119.5, 270.5]),
+                              makeFigure_flag=True,
+                              plev=plev,
+                              quiver_flag=False,  # True,
+                              quiverDs=obsQuivDs,
+                              quiverLat=obsQuivDs['lat'],
+                              quiverLon=obsQuivDs['lon'],
+                              # quiverDiffDs=(dataSets_rg[diffCase]
+                              #              if uVar in dataSets_rg[diffCase]
+                              #              else dataSets[diffCase]),
+                              quiverNorm_flag=False,
+                              quiverScale=quiverProps['quiverScale'],
+                              quiverScaleVar=None,
+                              rmRegMean_flag=False,
+                              save_flag=save_flag,
+                              saveDir=(setfilepaths()[2] + saveSubDir +
+                                          'obs_'),
+                              stampDate_flag=False,
+                              tSteps=tSteps,
+                              tStepLabel_flag=True,
+                              uRef=quiverProps['uRef'],
+                              uVar=obsUVar,
+                              vVar=obsVVar,
+                              )
 
 # %% Load and plot GPCP as a test
 
@@ -668,8 +697,16 @@ if __name__ == '__main__':
                               )
 
 # %% Plot multiple maps
+    # save_flag = True
     if plotMultiMap_flag:
         plotVars = ['TS']
+        uVar = 'TAUX'
+        vVar = 'TAUY'
+        diffIdList = ['01', '01', '28',
+                      '36', 'ga7.66', '119',
+                      '125', '161', '194',
+                      ]
+        # np.roll(versionIds, 1)
         for plotVar in plotVars:
             c1to2p.plotmultilatlon(dataSets,
                                    versionIds,
@@ -680,11 +717,11 @@ if __name__ == '__main__':
                                    cbar_flag=True,
                                    cbarOrientation='vertical',
                                    compcont_flag=True,
-                                   diff_flag=False,
-                                   diffIdList=versionIds,
-                                   diffDs=dataSets,
-                                   diffPlev=200,
-                                   diffVar='U',
+                                   diff_flag=True,
+                                   diffIdList=['HadIsst']*9,
+                                   diffDs=hadIsstDs,  # dataSets,
+                                   diffPlev=850,
+                                   diffVar='sst',  # plotVar,  # 'U',
                                    fontSize=24,
                                    latLim=np.array([-30.1, 30.1]),
                                    latlbls=None,
@@ -693,22 +730,25 @@ if __name__ == '__main__':
                                    lonlbls=None,
                                    ocnOnly_flag=False,
                                    plev=850,
-                                   quiver_flag=True,
-                                   quiverNorm_flag=True,
-                                   quiverScale=5,
+                                   quiver_flag=False,
+                                   quiverNorm_flag=False,
+                                   quiverScale=getquiverprops(
+                                       uVar, vVar)['quiverScale'],
                                    quiverUnits='inches',
                                    rmRegLatLim=np.array([-20, 20]),
                                    rmRegLonLim=np.array([119.5, 270.5]),
                                    rmRegMean_flag=False,
                                    rmse_flag=False,
                                    save_flag=save_flag,
-                                   saveDir=setfilepaths()[2] + saveSubDir,
+                                   saveDir=(setfilepaths()[2] + saveSubDir +
+                                            ''),  # 'multimaps/'),
                                    stampDate_flag=False,
                                    subFigCountStart='a',
                                    subSamp=7,
                                    tSteps=np.arange(0, 12),
-                                   uVar='TAUX',
-                                   vVar='TAUY',
+                                   uRef=getquiverprops(uVar, vVar)['uRef'],
+                                   uVar=uVar,
+                                   vVar=vVar,
                                    )
 
 # %% Plot regional means (biases)
@@ -1109,14 +1149,15 @@ if __name__ == '__main__':
     if plotPai_flag:
 
         # Set name of index to plot
-        indexName = 'pcent'
+        #   available: 'dITCZ', 'PAI', 'pcent', 'dsstdy_epac'
+        indexName = 'dsstdy_epac'  # 'dsstdy_epac'
         plotVar = None
 
         # Set plotting flags and specifications
         rmAnnMean_flag = False
         ocnOnly_flag = False
         plotAnnMean_flag = True
-        plotPeriodMean_flag = False
+        plotPeriodMean_flag = True
         tSteps = np.arange(1, 5)
         # tSteps = np.append(np.arange(0, 12), 0)
 
@@ -1126,38 +1167,57 @@ if __name__ == '__main__':
 
         if indexName in ['dITCZ']:
             ds = dataSets
-            yLim = np.array([0, 6])
-            yLim_annMean = np.array([0, 3])
             plotObs_flag = True
-            obsDx = gpcpDs
+            plotVar = 'PRECT'
+            obsDs = gpcpDs
             obsVar = 'precip'
             ocnOnly_flag = False
             title = 'Double-ITCZ Index'
+            yLim = np.array([0, 6])
+            yLim_annMean = np.array([0, 3])
+        elif indexName.lower() in ['dpdy_epac']:
+            ds = dataSets
+            plotObs_flag = True
+            plotVar = 'PS'
+            obsDs = eraiDs
+            obsVar = 'sp'
+            ocnOnly_flag = True
+            title = 'dP/dy (E Pac)'
+            yLim = np.array([-1.5, 1.5])
+            yLim_annMean = np.array([-1, 0])
+            yLim_period = np.array([-1, 1])
+        elif indexName.lower() in ['dsstdy_epac']:
+            ds = dataSets
+            plotObs_flag = True
+            plotVar = 'TS'
+            obsDs = hadIsstDs
+            obsVar = 'sst'
+            ocnOnly_flag = True
+            title = 'dSST/dy (E. Pac)'
+            yLim = np.array([-3, 3])
+            yLim_annMean = np.array([0, 2])
+            yLim_period = np.array([-1.2, 1])
         elif indexName in ['PAI']:
             ds = dataSets
-            yLim = np.array([-1.5, 1.5])
-            yLim_annMean = np.array([0, 0.5])
             plotObs_flag = True
+            plotVar = 'PRECT'
             # obsDs = gpcpClimoDs
             obsDs = gpcpDs
             obsVar = 'precip'
             ocnOnly_flag = False
             title = 'Precipitation Asymmetry Index'
+            yLim = np.array([-1.5, 1.5])
+            yLim_annMean = np.array([0, 0.5])
         elif indexName.lower() in ['pcent']:
             ds = dataSets
-            yLim = np.array([-10, 10])
-            yLim_annMean = np.array([-5, 5])
             plotObs_flag = True
+            plotVar = 'PRECT'
             obsDs = gpcpDs
             obsVar = 'precip'
             ocnOnly_flag = False
             title = 'Precipitation Centroid'
-
-        if plotVar is None:
-            plotVar = {'ditcz': 'PRECT',
-                       'pai': 'PRECT',
-                       'pcent': 'PRECT',
-                       }[indexName.lower()]
+            yLim = np.array([-10, 10])
+            yLim_annMean = np.array([-5, 5])
 
         # Create dictionary to hold annual mean value (and colors)
         annMean = dict()
@@ -1168,37 +1228,37 @@ if __name__ == '__main__':
         hf = plt.figure()
 
         for vid in versionIds:
-            # Compute PAI through time
-            paiDa = c1to2p.calcregmeanindex(ds[vid],
-                                            indexName,
-                                            indexType=None,
-                                            indexVar=plotVar,
-                                            ocnOnly_flag=ocnOnly_flag,
-                                            )
+            # Compute given index through time
+            indexDa = c1to2p.calcregmeanindex(ds[vid],
+                                              indexName,
+                                              indexType=None,
+                                              indexVar=plotVar,
+                                              ocnOnly_flag=ocnOnly_flag,
+                                              )
 
             # Pull regional mean through time and plot
-            pData = (paiDa.values - paiDa.mean(dim='time').values
+            pData = (indexDa.values - indexDa.mean(dim='time').values
                      if rmAnnMean_flag
-                     else paiDa.values)
+                     else indexDa.values)
             hl, = plt.plot(np.arange(1, 13),
                            pData,
                            color=colorDict[vid],
                            label=vid,
                            marker='o',
                            )
-            annMean[vid] = paiDa.mean(dim='time')
-            timeMean[vid] = paiDa.values[tSteps].mean()
+            annMean[vid] = indexDa.mean(dim='time')
+            timeMean[vid] = indexDa.values[tSteps].mean()
 
         # Repeat above for obs
         if plotObs_flag:
-            # Compute PAI through time
-            obsPaiDa = c1to2p.calcregmeanindex(obsDs,
-                                               indexName,
-                                               indexType=None,
-                                               indexVar=obsVar,
-                                               ocnOnly_flag=False,
-                                               qc_flag=False,
-                                               )
+            # Compute given index through time
+            obsIndexDa = c1to2p.calcregmeanindex(obsDs,
+                                                 indexName,
+                                                 indexType=None,
+                                                 indexVar=obsVar,
+                                                 ocnOnly_flag=False,
+                                                 qc_flag=False,
+                                                 )
 
             # Ensure plotting on correct figure
             plt.figure(hf.number)
@@ -1206,15 +1266,15 @@ if __name__ == '__main__':
             # Get data for plotting
             #   also remove annual mean if requested
             try:
-                pData = (obsPaiDa.values -
-                         obsPaiDa.mean(dim='time').values
+                pData = (obsIndexDa.values -
+                         obsIndexDa.mean(dim='time').values
                          if rmAnnMean_flag
-                         else obsPaiDa.values)
+                         else obsIndexDa.values)
             except ValueError:
-                pData = (obsPaiDa.values -
-                         obsPaiDa.mean(dim='month').values
+                pData = (obsIndexDa.values -
+                         obsIndexDa.mean(dim='month').values
                          if rmAnnMean_flag
-                         else obsPaiDa.values)
+                         else obsIndexDa.values)
 
             # Plot time series
             try:
@@ -1239,9 +1299,9 @@ if __name__ == '__main__':
 
             # Compute annual means
             try:
-                annMean['obs'] = obsPaiDa.mean(dim='time')
+                annMean['obs'] = obsIndexDa.mean(dim='time')
             except ValueError:
-                annMean['obs'] = obsPaiDa.mean(dim='month')
+                annMean['obs'] = obsIndexDa.mean(dim='month')
 
             # Compute mean over given timesteps
             timeMean['obs'] = pData[tSteps].mean()
@@ -1250,8 +1310,8 @@ if __name__ == '__main__':
         plt.xlabel('Month')
 
         plt.ylabel('{:s}'.format(title) +
-                   (' ({:s})'.format(paiDa.units)
-                    if paiDa.units is not None
+                   (' ({:s})'.format(indexDa.units)
+                    if indexDa.units is not None
                     else '') +
                    ('\n[Annual mean removed]' if rmAnnMean_flag else '')
                    )
@@ -1378,16 +1438,8 @@ if __name__ == '__main__':
                         else versionIds))
             plt.xlabel('Version')
 
-            plt.ylabel(plotVar + ' (' +
-                       mwp.getlatlimstring(latLim) + ', ' +
-                       mwp.getlonlimstring(lonLim, lonFormat='EW') +
-                       ((' minus \n' +
-                         mwp.getlatlimstring(refLatLim) + ', ' +
-                         mwp.getlonlimstring(lonLim, lonFormat='EW')
-                         ) if rmRefRegMean_flag else '') +
-                       ')'
-                       )
-            plt.ylim(yLim)
+            plt.ylabel(indexName)
+            plt.ylim(yLim_period)
 
             plt.grid(ls='--')
             plt.gca().set_axisbelow(True)
@@ -1397,10 +1449,7 @@ if __name__ == '__main__':
             tStepString = ''.join([monIds[tStep] for tStep in tSteps])
             if tStepString == 'JFD':
                 tStepString = 'DJF'
-            plt.title('{:s} mean {:s}'.format(tStepString, title) +
-                      ('\n(divided by Tropical Mean)' if divideByTropMean_flag
-                       else '')
-                      )
+            plt.title('{:s} mean {:s}'.format(tStepString, title))
 
 
 # %% Correlate bias indices (CTI, dTICZ, Walker)

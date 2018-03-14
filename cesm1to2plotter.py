@@ -56,6 +56,7 @@ def calcregmeanindex(ds,
     - CTI - cold tongue index
     - dITCZ - double-ITCZ index
     - dSLP - Eq. Pacific SLP gradient (~Walker strength)
+    - dSSTdy_epac - East Pacific Meridional SST gradient
     - walker - Walker circulation index (based on pressure)
     - pai - precipitation asymmetry index
     - pcent - precipitation centroid
@@ -97,9 +98,21 @@ def calcregmeanindex(ds,
 
         # Compute double-ITCZ index
         indexDa = mwfn.calcdsditczindex(ds,
-                                        indexType='Bellucci2010',
+                                        indexType=indexType,
                                         precipVar=indexVar,
                                         )
+
+    elif indexName.lower() in ['dsstdy_epac', 'dpdy_epac']:
+        # Assign default index if none provided
+        if indexType is None:
+            indexType = 'epac'
+        if indexVar is None:
+            indexVar = 'TS'
+
+        # Compute dsstdy_epac
+        indexDa = mwfn.calcdsddyindex(ds,
+                                      indexType=indexType,
+                                      indexVar=indexVar)
 
     elif indexName.lower() in ['walker', 'dslp']:
         # Assign default index if none provided
@@ -281,18 +294,22 @@ def getmapcontlevels(plotVar,
                       'FNS': np.arange(-200, 200.1, 20),
                       'FSNS': np.arange(-50, 50.1, 5.),
                       'LHFLX': np.arange(-50, 50.1, 5),
+                      'LWCF': np.arange(-20, 20.1, 2),
                       'OMEGA': np.arange(-0.12, 0.12001, 0.01),
                       'OMEGA500': np.arange(-0.125, 0.1251, 0.0125),
                       'OMEGA850': np.arange(-0.125, 0.1251, 0.0125),
+                      'PBLH': np.arange(-150, 150.1, 15),
                       'PRECC': np.arange(-10, 10.1, 1),
                       'PRECL': np.arange(-10, 10.1, 1),
                       'PRECT': np.arange(-10, 10.1, 1),
                       'PS': np.arange(-4., 4.01, 0.5),
                       'PSL': np.arange(-4, 4.01, 0.5),
-                      'SHFLX': np.arange(-10, 10., 1.),
+                      'SHFLX': np.arange(-10, 10.1, 1.),
+                      'SWCF': np.arange(-30, 30.1, 3),
                       'T': np.arange(-2, 2.1, 0.2),
                       'TAUX': np.arange(-0.1, 0.101, 0.01),
                       'TAUY': np.arange(-0.1, 0.101, 0.01),
+                      'TMQ': np.arange(-10, 10.1, 1),
                       'TS': np.arange(-2, 2.1, 0.2),
                       'U': np.arange(-5, 5.1, 0.5),
                       'V': np.arange(-2, 2.1, 0.2),
@@ -302,6 +319,8 @@ def getmapcontlevels(plotVar,
                       'divTau': np.arange(-1e-7, 1.01e-7, 1e-8),
                       'ekmanx': np.arange(-1.5e5, 1.501e5, 1.5e4),
                       'ekmany': np.arange(-1e4, 1.01e4, 1e3),
+                      'iews': np.arange(-0.1, 0.101, 0.01),
+                      'inss': np.arange(-0.1, 0.101, 0.01),
                       'precip': np.arange(-10, 10.1, 1),
                       'sst': np.arange(-2, 2.1, 0.2),
                       'sverdrupx': np.arange(-1.5e5, 1.501e5, 1.5e4),
@@ -342,6 +361,8 @@ def getmapcontlevels(plotVar,
                       'divTau': np.arange(-2e-7, 2.01e-7, 2e-8),
                       'ekmanx': np.arange(-1.5e5, 1.501e5, 1.5e4),
                       'ekmany': np.arange(-3e4, 3.01e4, 3e3),
+                      'iews': np.arange(-0.2, 0.201, 0.02),
+                      'inss': np.arange(-0.1, 0.101, 0.01),
                       'precip': np.arange(0, 20.1, 2),
                       'sst': np.arange(290, 305, 1),
                       'sverdrupx': np.arange(-1.5e5, 1.501e5, 1.5e4),
@@ -685,11 +706,13 @@ def plotlatlon(ds,
                diffTSteps=None,
                diffVar=None,
                fontSize=12,
+               figDims=None,
                latLim=np.array([-30, 30]),
                latlbls=None,
                levels=None,
                lonLim=np.array([119.5, 270.5]),
                lonlbls=None,
+               makeFigure_flag=True,
                newUnits=None,
                ocnOnly_flag=False,
                plev=None,
@@ -705,6 +728,8 @@ def plotlatlon(ds,
                rmRegLonLim=None,
                rmRegMean_flag=False,
                rmse_flag=False,
+               save_flag=False,
+               saveDir=None,
                stampDate_flag=True,
                subSamp=None,
                tSteps=None,
@@ -719,7 +744,7 @@ def plotlatlon(ds,
     Plot a map of a given dataset averaged over the specified timesteps
 
     Version Date:
-        2017-10-17
+        2018-03-13
     """
 
     # Set lats/lons to label if not provided
@@ -966,6 +991,12 @@ def plotlatlon(ds,
         if all([diff_flag, plev != diffPlev]):
             varName = varName + '-' + str(diffPlev)
 
+    # Create figure for plotting
+    if makeFigure_flag:
+        hf = plt.figure()
+        if figDims is not None:
+            hf.set_size_inches(figDims)
+
     # Plot map
     im1, ax = mwp.plotmap(ds.lon,
                           ds.lat,
@@ -996,19 +1027,19 @@ def plotlatlon(ds,
                           quiverScale=quiverScale,
                           quiverUnits=quiverUnits,
                           U=uData,
-                          Uname=(ds[uVar].name
-                                 if uVar in ds.data_vars
+                          Uname=(quiverDs[uVar].name
+                                 if uVar in quiverDs.data_vars
                                  else None),
-                          Uunits=((ds[quiverScaleVar].units
+                          Uunits=((quiverDs[quiverScaleVar].units
                                    if quiverScaleVar is not None else
-                                   ds[uVar].units)
-                                  if uVar in ds.data_vars
+                                   quiverDs[uVar].units)
+                                  if uVar in quiverDs.data_vars
                                   else None),
                           Uref=uRef,  # 0.1,
                           V=vData,
                           subSamp=((3 if subSamp is None else subSamp)
                                    # ds['TAUX'].shape[1]/36
-                                   if uVar in ds.data_vars
+                                   if uVar in quiverDs.data_vars
                                    else None),
                           tStepLabel_flag=False,
                           **kwargs
@@ -1047,6 +1078,57 @@ def plotlatlon(ds,
 
     if stampDate_flag:
         mwp.stampdate(x=1, y=0)
+
+    # Save figure if requested
+    if save_flag:
+
+        # Set directory for saving
+        if saveDir is None:
+            saveDir = os.path.dirname(os.path.realpath(__file__))
+
+        # Set file name for saving
+        tString = 'mon'
+        if diff_flag:
+            # Get variable name for saving
+            varName = plotVar
+            if np.ndim(ds[plotVar]) == 4:
+                # Add level if original field is 4d
+                varName = varName + str(plev)
+            if plev != diffPlev:
+                # Add differencing of levels if plotting differences and
+                #   plev and diffPlev are not the same (for plotting shears)
+                varName = varName + '-' + str(diffPlev)
+
+                # Set name of case
+                caseString = ds.id
+            else:
+                caseString = ds.id + '-' + diffDs.id
+
+            saveFile = (varName +
+                        '_latlon_' +
+                        caseString + '_' +
+                        tString +
+                        '{:03.0f}'.format(tSteps[0]) + '-' +
+                        '{:03.0f}'.format(tSteps[-1]))
+        else:
+            saveFile = (
+                plotVar + '_latlon_' +
+                ds.id + '_' +
+                tString +
+                '{:03.0f}'.format(tSteps[0]) + '-' +
+                '{:03.0f}'.format(tSteps[-1]) +
+                ('_nocb' if not cbar_flag else '')
+                )
+
+        # Set saved figure size (inches)
+        fx = hf.get_size_inches()[0]
+        fy = hf.get_size_inches()[1]
+
+        # Save figure
+        print(saveDir + saveFile)
+        mwp.savefig(saveDir + saveFile,
+                    shape=np.array([fx, fy]))
+        plt.close('all')
 
     return (im1, ax, compcont)
 
@@ -1214,6 +1296,7 @@ def plotmultilatlon(dsDict,
                 latlbls=latlbls,
                 lonLim=lonLim,
                 lonlbls=lonlbls,
+                makeFigure_flag=False,
                 plev=plev,
                 quiver_flag=quiver_flag,
                 quiverScale=quiverScale,
@@ -1222,6 +1305,7 @@ def plotmultilatlon(dsDict,
                 # rmRegLonLim=rmRegLonLim,
                 # rmRegMean_flag=rmRegMean_flag,
                 rmse_flag=rmse_flag,
+                save_flag=False,
                 stampDate_flag=stampDate_flag,
                 tSteps=tSteps,
                 tStepLabel_flag=(jSet == 0),
@@ -1240,11 +1324,13 @@ def plotmultilatlon(dsDict,
                 latlbls=latlbls,
                 lonLim=lonLim,
                 lonlbls=lonlbls,
+                makeFigure_flag=False,
                 plev=plev,
                 quiver_flag=quiver_flag,
                 quiverScale=quiverScale,
                 quiverUnits=quiverUnits,
                 # rmRegMean_flag=rmRegMean_flag,
+                save_flag=False,
                 stampDate_flag=stampDate_flag,
                 tSteps=tSteps,
                 tStepLabel_flag=(jSet == 0),
@@ -1364,7 +1450,7 @@ def plotmultilatlon(dsDict,
         if diff_flag:
             if all([diffIdList[j] == diffIdList[0]
                     for j in range(len(diffIdList))]):
-                diffStr = 'd' + diffIdList[0][plotVar].srcid + '_'
+                diffStr = 'd' + diffIdList[0] + '_'
             else:
                 diffStr = ''
             # Get variable name for saving

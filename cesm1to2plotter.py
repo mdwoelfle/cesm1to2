@@ -25,20 +25,18 @@ import mdwtools.mdwfunctions as mwfn  # import personal processing functions
 import mdwtools.mdwplots as mwp       # import personal plotting functions
 # import netCDF4 as nc4            # import netCDF4 as nc4
 import numpy as np               # import numpy as np
-from socket import gethostname   # used to determine which machine we are
+# from socket import gethostname   # used to determine which machine we are
 #                                #   running on
-from datetime import datetime    # for working with dates and stuff
-import time
+# from datetime import datetime    # for working with dates and stuff
+# import time
 
 # Functions for plotlatloncontsovertime
-from mpl_toolkits.basemap import Basemap  # import tool for lat/lon plotting
-from matplotlib import cm  # import access to colormaps
+# from mpl_toolkits.basemap import Basemap  # import tool for lat/lon plotting
+# from matplotlib import cm  # import access to colormaps
 
-from scipy import interpolate    # import interpolation functions from scipy
-# import scr_150720_popbasics as popbasics
-# import scr_150806_atmbasics as atmbasics
+# from scipy import interpolate    # import interpolation functions from scipy
 
-import multiprocessing as mp  # Allow use of multiple cores
+# import multiprocessing as mp  # Allow use of multiple cores
 
 # %% Define functions
 
@@ -57,6 +55,7 @@ def calcregmeanindex(ds,
     - dITCZ - double-ITCZ index
     - dSLP - Eq. Pacific SLP gradient (~Walker strength)
     - dSSTdy_epac - East Pacific Meridional SST gradient
+    - fnsasym - Asymmetry in net surface flux over ocean only
     - walker - Walker circulation index (based on pressure)
     - pai - precipitation asymmetry index
     - pcent - precipitation centroid
@@ -114,6 +113,48 @@ def calcregmeanindex(ds,
                                       indexType=indexType,
                                       indexVar=indexVar)
 
+    elif indexName.lower() in ['fnsasym']:
+        # Assign default index if none provided
+        if indexType is None:
+            indexType = 'Xiangetal2017'
+        if indexVar is None:
+            indexVar = 'FNS'
+
+        # Compute net surface flux asymmetry
+        indexDa = mwfn.calcdsfnsasymindex(ds,
+                                          indexType=indexType,
+                                          fnsVar=indexVar,
+                                          qc_flag=qc_flag
+                                          )
+
+    elif indexName.lower() in ['pai', 'precipasymmetry']:
+        # Assign default index if none provded
+        if indexType is None:
+            indexType = 'HwangFrierson2012'
+        if indexVar is None:
+            indexVar = 'PRECT'
+
+        # Compute precipitation asymmetry index
+        indexDa = mwfn.calcdsprecipasymindex(ds,
+                                             indexType=indexType,
+                                             precipVar=indexVar,
+                                             qc_flag=qc_flag,
+                                             )
+
+    elif indexName.lower() in ['precipcentroid', 'precipitationcentroid',
+                               'pcent']:
+        # Assign default index if none provided
+        if indexType is None:
+            indexType = 'areaweight'
+        if indexVar is None:
+            indexVar = 'PRECT'
+
+        # Compute centroid of tropical precipitation
+        indexDa = mwfn.calcdsprecipcentroid(ds,
+                                            indexType=indexType,
+                                            precipVar=indexVar,
+                                            qc_flag=qc_flag)
+
     elif indexName.lower() in ['walker', 'dslp']:
         # Assign default index if none provided
         if indexType is None:
@@ -130,32 +171,6 @@ def calcregmeanindex(ds,
                                          ocnOnly_flag=ocnOnly_flag,
                                          pressureVar=indexVar,
                                          )
-    elif indexName.lower() in ['pai', 'precipasymmetry']:
-        # Assigne default index if none provded
-        if indexType is None:
-            indexType = 'HwangFrierson2012'
-        if indexVar is None:
-            indexVar == 'PRECT'
-
-        # Compute precipitation asymmetry index
-        indexDa = mwfn.calcdsprecipasymindex(ds,
-                                             indexType=indexType,
-                                             precipVar=indexVar,
-                                             qc_flag=qc_flag,
-                                             )
-    elif indexName.lower() in ['precipcentroid', 'precipitationcentroid',
-                               'pcent']:
-        # Assign default index if none provided
-        if indexType is None:
-            indexType = 'areaweight'
-        if indexVar is None:
-            indexVar = 'PRECT'
-
-        # Compute centroid of tropical precipitation
-        indexDa = mwfn.calcdsprecipcentroid(ds,
-                                            indexType=indexType,
-                                            precipVar=indexVar,
-                                            qc_flag=qc_flag)
     else:
         raise NameError('Cannot find function to compute ' +
                         'index: {:s}'.format(indexName))
@@ -253,14 +268,19 @@ def getcompcont(plotVar,
 
 def getcolordict():
     return {'01': '#1f77b4',
+            '28': '#ff7f0e',
+            '36': '#2ca02c',
+            'ga7.66': '#d62728',
+            '100': '#42e5f4',
+            '113': '#aff441',
+            '114': '#f441a6',
+            '116': '#41f4b2',
+            '118': '#f4b541',
             '119': '#9467bd',
             '125': '#8c564b',
             '161': '#e377c2',
             '194': '#7f7f7f',
             '195': '#bcbd22',
-            '28': '#ff7f0e',
-            '36': '#2ca02c',
-            'ga7.66': '#d62728',
             'obs': [0, 0, 0]}
 
 
@@ -523,7 +543,9 @@ def plotbiasrelation(ds,
     indexTypes = {'cpacshear': 'testing',
                   'cti': 'Woelfleetal2017',
                   'ditcz': 'Bellucci2010',
+                  'dpdy_epac': 'epac',
                   'dslp': 'DiNezioetal2013',
+                  'dsstdy_epac': 'epac',
                   'walker': 'testing'}
     if xIndexType is None:
         xIndexType = indexTypes[xIndex.lower()]
@@ -532,14 +554,18 @@ def plotbiasrelation(ds,
     indexVars = {'cpacshear': 'U',
                  'cti': 'TS',
                  'ditcz': 'PRECT',
+                 'dpdy_epac': 'PS',
                  'dslp': 'PSL',
+                 'dsstdy_epac': 'TS',
                  'walker': 'PS'}
     labelDict = {'cpacshear': 'Central Pacific Wind Shear' +
                               ' (850-200 hPa; {:s})'.format(
                                   ds[versionIds[0]]['U'].units),
                  'cti': 'Cold Tongue Index (K)',
                  'ditcz': 'Double-ITCZ Index (mm/d)',
+                 'dpdy_epac': 'E. Pac. Meridional SST gradient (hPa)',
                  'dslp': 'SLP Gradient (hPa)',
+                 'dsstdy_epac': 'E. Pac. Meridional SST gradient (K)',
                  'walker': 'Walker Circulation Index (hPa)'}
     if plotObs_flag:
         #        obsDsDict = {'cpacshear': obsDsDict['cpacshear'],
@@ -549,7 +575,9 @@ def plotbiasrelation(ds,
         obsVars = {'cpacshear': 'u',
                    'cti': 'sst',
                    'ditcz': 'precip',
+                   'dpdy_epac': 'sp',
                    'dslp': 'msl',
+                   'dsstdy_epac': 'sst',
                    'walker': 'sp'}
 
     # Compute indices for various model versions
@@ -583,7 +611,10 @@ def plotbiasrelation(ds,
             indexType=indexTypes[xIndex.lower()],
             indexVar=obsVars[xIndex.lower()],
             ocnOnly_flag=False)
-        xMean['obs'] = xObsDa[xTSteps].mean(dim='time')
+        try:
+            xMean['obs'] = xObsDa[xTSteps].mean(dim='time')
+        except ValueError:
+            xMean['obs'] = xObsDa[xTSteps].mean(dim='month')
         # print(xMean['obs'].values)
 
         # Second index
@@ -593,7 +624,10 @@ def plotbiasrelation(ds,
             indexType=indexTypes[yIndex.lower()],
             indexVar=obsVars[yIndex.lower()],
             ocnOnly_flag=False)
-        yMean['obs'] = yObsDa[yTSteps].mean(dim='time')
+        try:
+            yMean['obs'] = yObsDa[yTSteps].mean(dim='time')
+        except ValueError:
+            xMean['obs'] = yObsDa[yTSteps].mean(dim='month')
         # print(yMean['obs'].values)
 
     # Plot versus one another as scatter plot

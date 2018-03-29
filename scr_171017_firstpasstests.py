@@ -77,21 +77,7 @@ def setfilepaths():
 
 
 def getcolordict():
-    return {'01': '#1f77b4',
-            '28': '#ff7f0e',
-            '36': '#2ca02c',
-            'ga7.66': '#d62728',
-            '100': '#42e5f4',
-            '113': '#aff441',
-            '114': '#f441a6',
-            '116': '#41f4b2',
-            '118': '#f4b541',
-            '119': '#9467bd',
-            '125': '#8c564b',
-            '161': '#e377c2',
-            '194': '#7f7f7f',
-            '195': '#bcbd22',
-            'obs': [0, 0, 0]}
+    return c1to2p.getcolordict()
 
 
 def getquiverprops(uVar,
@@ -151,7 +137,6 @@ if __name__ == '__main__':
     mp_flag = True  # True to use multiprocessing when regridding
     obs_flag = False
     ocnOnly_flag = True  # Need to implement to confirm CTindex is right.
-    prect_flag = True
     regridVertical_flag = False
     regrid2file_flag = False
     reload_flag = False
@@ -159,10 +144,13 @@ if __name__ == '__main__':
     saveSubDir = 'testfigs/66to125/'
     verbose_flag = False
 
+    fns_flag = True
+    prect_flag = True
+
     plotBiasRelation_flag = False
+    plotIndices_flag = True
     plotObsMap_flag = False
     plotOneMap_flag = False
-    plotPai_flag = True
     plotMultiMap_flag = False
     plotGpcpTest_flag = False
     plotRegMean_flag = False
@@ -180,19 +168,19 @@ if __name__ == '__main__':
 
     # Set name(s) of file(s) to load
     versionIds = ['01',
-                  # '28',
-                  # '36',
+                  '28',
+                  '36',
                   'ga7.66',
-                  '100',
-                  '113',
-                  '114',
-                  '116',
-                  '118',
+                  # # '100',
+                  # # '113',
+                  # # '114',
+                  # # '116',
+                  # # '118',
                   '119',
                   '125',
-                  # '161',
-                  # '194',
-                  # '195'
+                  '161',
+                  '194',
+                  '195'
                   ]
     fileBaseDict = {'01': 'b.e15.B1850G.f09_g16.pi_control.01',
                     '28': 'b.e15.B1850G.f09_g16.pi_control.28',
@@ -241,6 +229,13 @@ if __name__ == '__main__':
             if verbose_flag:
                 print(vid)
             dataSets[vid]['PRECT'] = mwfn.calcprectda(dataSets[vid])
+
+    # Compute FNS if needed
+    if fns_flag:
+        for vid in versionIds:
+            if verbose_flag:
+                print(vid)
+            dataSets[vid]['FNS'] = mwfn.calcfnsda(dataSets[vid])
 
     # Add version id to dataSets for easy access and bookkeeping
     for vid in versionIds:
@@ -1146,16 +1141,16 @@ if __name__ == '__main__':
                       )
 
 # %% Plot predefined indices through time or as annual mean
-    if plotPai_flag:
+    if plotIndices_flag:
 
         # Set name of index to plot
-        #   available: 'dITCZ', 'PAI', 'pcent', 'dsstdy_epac'
-        indexName = 'dsstdy_epac'  # 'dsstdy_epac'
+        #   available: 'dITCZ', 'PAI', 'pcent', 'dsstdy_epac', 'fnsasym'
+        indexName = 'fnsasym'
         plotVar = None
 
         # Set plotting flags and specifications
         rmAnnMean_flag = False
-        ocnOnly_flag = False
+        ocnOnly_flag = True
         plotAnnMean_flag = True
         plotPeriodMean_flag = True
         tSteps = np.arange(1, 5)
@@ -1197,6 +1192,16 @@ if __name__ == '__main__':
             yLim = np.array([-3, 3])
             yLim_annMean = np.array([0, 2])
             yLim_period = np.array([-1.2, 1])
+        elif indexName.lower() in ['fnsasym']:
+            ds = dataSets
+            plotObs_flag = False
+            plotVar = 'FNS'
+            obsDs = None
+            obsVar = None
+            ocnOnly_flag = True
+            title = 'FNS Asymmetry'
+            yLim = None
+            yLim_annMean = None
         elif indexName in ['PAI']:
             ds = dataSets
             plotObs_flag = True
@@ -1315,7 +1320,10 @@ if __name__ == '__main__':
                     else '') +
                    ('\n[Annual mean removed]' if rmAnnMean_flag else '')
                    )
-        plt.ylim(yLim)
+        try:
+            plt.ylim(yLim)
+        except NameError:
+            pass
 
         plt.legend(title='Version', ncol=2)
 
@@ -1385,8 +1393,15 @@ if __name__ == '__main__':
                         else versionIds))
             plt.xlabel('Version')
 
-            plt.ylabel(indexName)
-            plt.ylim(yLim_annMean)
+            plt.ylabel('{:s}'.format(title) +
+                       (' ({:s})'.format(indexDa.units)
+                       if indexDa.units is not None
+                       else '')
+                       )
+            try:
+                plt.ylim(yLim_annMean)
+            except NameError:
+                pass
 
             plt.grid(ls='--')
             plt.gca().set_axisbelow(True)
@@ -1438,8 +1453,15 @@ if __name__ == '__main__':
                         else versionIds))
             plt.xlabel('Version')
 
-            plt.ylabel(indexName)
-            plt.ylim(yLim_period)
+            plt.ylabel('{:s}'.format(title) +
+                       (' ({:s})'.format(indexDa.units)
+                       if indexDa.units is not None
+                       else '')
+                       )
+            try:
+                plt.ylim(yLim_period)
+            except NameError:
+                pass
 
             plt.grid(ls='--')
             plt.gca().set_axisbelow(True)
@@ -1450,24 +1472,31 @@ if __name__ == '__main__':
             if tStepString == 'JFD':
                 tStepString = 'DJF'
             plt.title('{:s} mean {:s}'.format(tStepString, title))
+            plt.tight_layout()
 
 
 # %% Correlate bias indices (CTI, dTICZ, Walker)
+
+    xIndex = 'dpdy_epac'
+    yIndex = 'dITCZ'
+
     if plotBiasRelation_flag:
 
         # True to use different time steps for x and y axes
         splitTSteps_flag = False
 
         c1to2p.plotbiasrelation(dataSets,
-                                'dSLP',
-                                'dITCZ',
+                                xIndex,
+                                yIndex,
                                 ds_rg=None,  # dataSets_rg
                                 legend_flag=True,
                                 makeFigure_flag=True,
                                 obsDsDict={'cpacshear': erai3dDs,
                                            'cti': hadIsstDs,
                                            'ditcz': gpcpClimoDs,
+                                           'dpdy_epac': eraiDs,
                                            'dslp': eraiDs,
+                                           'dsstdy_epac': hadIsstDs,
                                            'walker': eraiDs},
                                 plotObs_flag=True,
                                 splitTSteps_flag=splitTSteps_flag,
@@ -1482,13 +1511,12 @@ if __name__ == '__main__':
 
     if plotSeasonalBiasRelation_flag:
 
-        xIndex = 'CTI'
-        yIndex = 'dITCZ'
-
         matchLimits_flag = False
         axisLimitDict = {'cpacshear': np.array([-5, -25]),
                          'cti': np.array([-2, 0.5]),
                          'ditcz': np.array([0.5, 5]),
+                         'dpdy_epac': np.array([-1.5, 1.5]),
+                         'dsstdy_epac': np.array([-1.2, 1]),
                          'walker': np.array([1, 4.5]),
                          }
 
@@ -1509,12 +1537,14 @@ if __name__ == '__main__':
             c1to2p.plotbiasrelation(dataSets,
                                     xIndex,
                                     yIndex,
-                                    ds_rg=dataSets_rg,
+                                    ds_rg=None,  # dataSets_rg,
                                     legend_flag=(j == 3),
                                     makeFigure_flag=False,
                                     obsDsDict={'cpacshear': erai3dDs,
                                                'cti': hadIsstDs,
                                                'ditcz': gpcpClimoDs,
+                                               'dpdy_epac': eraiDs,
+                                               'dsstdy_epac': hadIsstDs,
                                                'walker': eraiDs},
                                     plotObs_flag=True,
                                     tSteps=None,

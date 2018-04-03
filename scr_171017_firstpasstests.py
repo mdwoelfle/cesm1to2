@@ -145,15 +145,16 @@ if __name__ == '__main__':
     verbose_flag = False
 
     fns_flag = True
+    fnt_flag = True
     prect_flag = True
 
     plotBiasRelation_flag = False
-    plotIndices_flag = True
+    plotIndices_flag = False
     plotObsMap_flag = False
     plotOneMap_flag = False
     plotMultiMap_flag = False
     plotGpcpTest_flag = False
-    plotRegMean_flag = False
+    plotRegMean_flag = True
     plotSeasonalBiasRelation_flag = False
     plotZonRegMeanHov_flag = False
     plotZonRegMeanLines_flag = False
@@ -171,11 +172,11 @@ if __name__ == '__main__':
                   '28',
                   '36',
                   'ga7.66',
-                  # # '100',
-                  # # '113',
-                  # # '114',
-                  # # '116',
-                  # # '118',
+                  '100',
+                  '113',
+                  '114',
+                  '116',
+                  '118',
                   '119',
                   '125',
                   '161',
@@ -223,19 +224,22 @@ if __name__ == '__main__':
                                                  decode_times=False)
                     for versionId in versionIds}
 
-    # Compute PRECT if needed
-    if prect_flag:
-        for vid in versionIds:
-            if verbose_flag:
-                print(vid)
+    # Compute extra variable fields as requested
+    for vid in versionIds:
+        if verbose_flag:
+            print(vid)
+
+        # Compute PRECT
+        if prect_flag:
             dataSets[vid]['PRECT'] = mwfn.calcprectda(dataSets[vid])
 
-    # Compute FNS if needed
-    if fns_flag:
-        for vid in versionIds:
-            if verbose_flag:
-                print(vid)
+        # Compute FNS
+        if fns_flag:
             dataSets[vid]['FNS'] = mwfn.calcfnsda(dataSets[vid])
+
+        # Compute FNT
+        if fnt_flag:
+            dataSets[vid]['FNT'] = mwfn.calcfntda(dataSets[vid])
 
     # Add version id to dataSets for easy access and bookkeeping
     for vid in versionIds:
@@ -751,7 +755,7 @@ if __name__ == '__main__':
     if plotRegMean_flag:
 
         # Set variable for plotting
-        plotVar = 'PRECT'
+        plotVar = 'FNT'
 
         # Set plotting flags and specifications
         rmAnnMean_flag = False
@@ -766,8 +770,22 @@ if __name__ == '__main__':
         # Set default plot values
         title = mwp.getplotvarstring(plotVar)
         yLim = None
+        yLim_annMean = None
+        rmRefRegMean_flag = False
+        colorDict = getcolordict()
 
-        if plotVar in ['PRECT', 'PRECL', 'PRECC']:
+        if plotVar in ['FNT']:
+            ds = dataSets
+            plotObs_flag = False
+            latLim = np.array([-90, 90])
+            lonLim = np.array([0, 360])
+            obsDs = None
+            obsVar = None
+            ocnOnly_flag = False
+            rmRefRegMean_flag = False
+            title = plotVar
+            yLim_annMean = None  # np.array([-0.1, 0.1])
+        elif plotVar in ['PRECT', 'PRECL', 'PRECC']:
             ds = dataSets
             yLim = np.array([0, 2]
                             if divideByTropMean_flag
@@ -844,7 +862,7 @@ if __name__ == '__main__':
         # Create dictionary to hold annual mean value (and colors)
         annMean = dict()
         timeMean = dict()
-        colorDict = dict()
+        # colorDict = dict()
 
         # Create figure for plotting
         plt.figure()
@@ -930,6 +948,7 @@ if __name__ == '__main__':
                      else regMeanDa.values)
             hl, = plt.plot(np.arange(1, 13),
                            pData,
+                           c=colorDict[vid],
                            label=vid,
                            marker='o',
                            )
@@ -1081,7 +1100,8 @@ if __name__ == '__main__':
                          ) if rmRefRegMean_flag else '') +
                        ')'
                        )
-            plt.ylim(yLim)
+            if yLim_annMean is not None:
+                plt.ylim(yLim_annMean)
 
             plt.grid(ls='--')
             plt.gca().set_axisbelow(True)

@@ -183,21 +183,7 @@ if __name__ == '__main__':
                   '194',
                   '195'
                   ]
-    fileBaseDict = {'01': 'b.e15.B1850G.f09_g16.pi_control.01',
-                    '28': 'b.e15.B1850G.f09_g16.pi_control.28',
-                    '36': 'b.e15.B1850.f09_g16.pi_control.36',
-                    'ga7.66': 'b.e15.B1850.f09_g16.pi_control.all_ga7.66',
-                    '100': 'b.e15.B1850.f09_g16.pi_control.all.100',
-                    '113': 'b.e15.B1850.f09_g16.pi_control.all.113',
-                    '114': 'b.e15.B1850.f09_g16.pi_control.all.114',
-                    '116': 'b.e15.B1850.f09_g16.pi_control.all.116',
-                    '118': 'b.e15.B1850.f09_g16.pi_control.all.118',
-                    '119': 'b.e15.B1850.f09_g16.pi_control.all.119',
-                    '125': 'b.e20.B1850.f09_g16.pi_control.all.125',
-                    '161': 'b.e20.BHIST.f09_g17.20thC.161_01',
-                    '194': 'b.e20.B1850.f09_g17.pi_control.all.194',
-                    '195': 'b.e20.B1850.f09_g17.pi_control.all.195',
-                    }
+    fileBaseDict = c1to2p.getcasebase()
     loadSuffixes = ['_' + '{:02d}'.format(mon + 1) + '_climo.nc'
                     for mon in range(12)]
 

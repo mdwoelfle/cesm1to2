@@ -187,6 +187,11 @@ def getavailableyearslist(versionId):
             '28': ['2-10', '2-20', '50-74', '75-99'],
             '36': ['2-10', '2-20', '21-40', '60-60', '75-99'],
             'ga7.66': ['2-20', '20-39', '55-74'],
+            '100': ['2-5', '2-7', '2-10', '2-20', '2-21', '10-29'],
+            '113': ['0.9x1.25', '2-21'],
+            '114': ['2-3', '2-11', '2-21'],
+            '116': ['2-3'],
+            '118': ['2-11', '2-21'],
             '119': ['2-9', '2-21', '21-40', '30-49', '75-99'],
             '125': ['2-9', '2-21', '11-30', '21-40', '70-89', '80-99',
                     '100-109', '100-119'],
@@ -196,20 +201,39 @@ def getavailableyearslist(versionId):
             }[versionId]
 
 
-def getcasebase(versionId):
+def getcasebase(versionId=None,
+                dict_flag=False
+                ):
     """
     Get long form nave for a given version ID for cesm1to2 cases
+    
+    Args:
+        versionId - id for the version of interest
+    Kwargs:
+        dict_flag - True to return full dictionary rather than one case's value 
     """
-    return {'01': 'b.e15.B1850G.f09_g16.pi_control.01',
-            '28': 'b.e15.B1850G.f09_g16.pi_control.28',
-            '36': 'b.e15.B1850.f09_g16.pi_control.36',
-            'ga7.66': 'b.e15.B1850.f09_g16.pi_control.all_ga7.66',
-            '119': 'b.e15.B1850.f09_g16.pi_control.all.119',
-            '125': 'b.e20.B1850.f09_g16.pi_control.all.125',
-            '161': 'b.e20.BHIST.f09_g17.20thC.161_01',
-            '194': 'b.e20.B1850.f09_g17.pi_control.all.194',
-            '195': 'b.e20.B1850.f09_g17.pi_control.all.195',
-            }[versionId]
+    # Define case bases
+    casebaseDict =  {'01': 'b.e15.B1850G.f09_g16.pi_control.01',
+                     '28': 'b.e15.B1850G.f09_g16.pi_control.28',
+                     '36': 'b.e15.B1850.f09_g16.pi_control.36',
+                     'ga7.66': 'b.e15.B1850.f09_g16.pi_control.all_ga7.66',
+                     '100': 'b.e15.B1850.f09_g16.pi_control.all.100',
+                     '113': 'b.e15.B1850.f09_g16.pi_control.all.113',
+                     '114': 'b.e15.B1850.f09_g16.pi_control.all.114',
+                     '116': 'b.e15.B1850.f09_g16.pi_control.all.116',
+                     '118': 'b.e15.B1850.f09_g16.pi_control.all.118',
+                     '119': 'b.e15.B1850.f09_g16.pi_control.all.119',
+                     '125': 'b.e20.B1850.f09_g16.pi_control.all.125',
+                     '161': 'b.e20.BHIST.f09_g17.20thC.161_01',
+                     '194': 'b.e20.B1850.f09_g17.pi_control.all.194',
+                     '195': 'b.e20.B1850.f09_g17.pi_control.all.195',
+                     }
+
+    # Return as requested
+    if any([dict_flag, versionId is None]):
+        return casebaseDict
+    else:
+        return casebaseDict[versionId]
 
 
 def getcompcont(plotVar,
@@ -482,7 +506,9 @@ def getyearsubdirs(versionId):
         return ['yrs_2-10', 'yrs_2-20', 'yrs50-74', 'yrs75-99']
     else:
         yrIds = getavailableyearslist(versionId)
-        return ['yrs_{:s}'.format(yid)
+        return [('{:s}'.format(yid)
+                 if 'x' in yid else
+                 'yrs_{:s}'.format(yid))
                 for yid in yrIds]
 
 

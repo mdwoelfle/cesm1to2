@@ -73,7 +73,7 @@ def setfilepaths():
         ncSubDir = ''
         saveDir = 'C:\\Users\\woelfle\\Documents\\UW\\CESM\\figs\\'
 
-    elif gethostname()[0:6] in ['yslogi', 'geyser', 'cheyen']:
+    elif gethostname()[0:6] in ['geyser', 'cheyen']:
         ncDir = '/glade/p/cgd/amp/people/hannay/amwg/climo/'
         ncSubDir = '0.9x1.25/'
         saveDir = '/glade/p/work/woelfle/figs/cesm1to2/'
@@ -82,16 +82,7 @@ def setfilepaths():
 
 
 def getcolordict():
-    return {'01': '#1f77b4',
-            '119': '#9467bd',
-            '125': '#8c564b',
-            '161': '#e377c2',
-            '194': '#7f7f7f',
-            '195': '#bcbd22',
-            '28': '#ff7f0e',
-            '36': '#2ca02c',
-            'ga7.66': '#d62728',
-            'obs': [0, 0, 0]}
+    return c1to2p.getcolordict()
 
 
 # %%
@@ -108,7 +99,7 @@ if __name__ == '__main__':
     plotObs_flag = True
     prect_flag = True
     save_flag = True
-    saveSubDir = 'testfigs/'
+    saveSubDir = ''
     verbose_flag = False
 
     # Get directory of file to load
@@ -116,16 +107,22 @@ if __name__ == '__main__':
 
     # Set name(s) of file(s) to load
     for versionId in [  # '28', '36',
-                      # 'ga7.66', '119', '125',
+                      # 'ga7.66',
+                      # '100',
+                      '113',
+                      '114',
+                      '116',
+                      '118',
+                      # '119',
+                      # '125',
                       # '161',
-                      '194',
+                      # '194',
                       # '195'
                       ]:
         print('\n\n---\nProcessing {:s}\n---\n\n'.format(versionId))
         caseBase = c1to2p.getcasebase(versionId)
         yrIds = c1to2p.getavailableyearslist(versionId)
         yrDirs = c1to2p.getyearsubdirs(versionId)
-        # subDirs = ['yrs_' + yr for yr in yrIds]
         fileName = caseBase + '_ANN_climo.nc'
 
         # Create list of files to load

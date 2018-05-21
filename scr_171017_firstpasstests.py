@@ -150,11 +150,11 @@ if __name__ == '__main__':
 
     plotBiasRelation_flag = False
     plotIndices_flag = False
-    plotObsMap_flag = False
-    plotOneMap_flag = False
+    plotObsMap_flag = True
+    plotOneMap_flag = True
     plotMultiMap_flag = False
     plotGpcpTest_flag = False
-    plotRegMean_flag = True
+    plotRegMean_flag = False
     plotSeasonalBiasRelation_flag = False
     plotZonRegMeanHov_flag = False
     plotZonRegMeanLines_flag = False
@@ -169,19 +169,19 @@ if __name__ == '__main__':
 
     # Set name(s) of file(s) to load
     versionIds = ['01',
-                  '28',
-                  '36',
-                  'ga7.66',
-                  '100',
-                  '113',
-                  '114',
-                  '116',
-                  '118',
+                  # '28',
+                  # '36',
+                  # 'ga7.66',
+                  # '100',
+                  # '113',
+                  # '114',
+                  # '116',
+                  # '118',
                   '119',
                   '125',
-                  '161',
-                  '194',
-                  '195'
+                  # '161',
+                  # '194',
+                  # '195'
                   ]
     fileBaseDict = c1to2p.getcasebase()
     loadSuffixes = ['_' + '{:02d}'.format(mon + 1) + '_climo.nc'
@@ -451,8 +451,8 @@ if __name__ == '__main__':
 
     # set plotting parameters
     latLim = np.array([-30, 30])
-    lonLim = np.array([119.5, 290.5])
-    # lonLim = np.array([0, 360])
+    # lonLim = np.array([119.5, 290.5])
+    lonLim = np.array([0, 360])
 
     latLbls = np.arange(-30, 31, 10)
     lonLbls = np.arange(120, 271, 30)
@@ -461,18 +461,19 @@ if __name__ == '__main__':
 
     if plotOneMap_flag:
 
-        for plotVar in ['PRECT', 'TS']:
+        for plotVar in ['PRECT']:
             plev = 900
             diffPlev = plev
             diff_flag = False  # False
             # plotCase = ''  # '125'
             # diffCase = 'ga7.66'  # '119'
-            plotCase, diffCase = [['ga7.66', '36'],
+            plotCase, diffCase = [['01', '01'],
+                                  ['ga7.66', '36'],
                                   ['119', '36'],
                                   ['118', 'ga7.66'],
                                   ['119', '118'],
                                   ['125', '119'],
-                                  ['125', '36']][2]
+                                  ['125', '36']][5]
             ocnOnly_flag = False
             quiver_flag = False
             uVar = 'TAUX'
@@ -488,56 +489,54 @@ if __name__ == '__main__':
                 dataSets_rg = {jCase: ['foo', 'bar']
                                for jCase in list(dataSets.keys())}
 
-            # Create figure for plotting
-            hf = plt.figure()
-
             # Get quiver properties
             quiverProps = getquiverprops(uVar, vVar, plev,
                                          diff_flag=diff_flag)
 
             # Plot some fields for comparison
-            c1to2p.plotlatlon((dataSets_rg[plotCase]
-                               if plotVar in dataSets_rg[plotCase]
-                               else dataSets[plotCase]),  # hadIsstDs
-                              plotVar,
-                              box_flag=False,
-                              boxLat=np.array([-3, 3]),
-                              boxLon=np.array([180, 220]),
-                              caseString=None,
-                              cbar_flag=True,
-                              # cbar_dy=0.001,
-                              cbar_height=0.02,
-                              cMap=None,  # 'RdBu_r',
-                              compcont_flag=True,
-                              diff_flag=diff_flag,
-                              diffDs=(dataSets_rg[diffCase]
-                                      if plotVar in dataSets_rg[diffCase]
-                                      else dataSets[diffCase]),  # gpcpClimoDs,
-                              diffPlev=diffPlev,
-                              fontSize=12,
-                              latLim=latLim,
-                              levels=None,  # np.arange(-15, 15.1, 1.5),
-                              lonLim=lonLim,
-                              ocnOnly_flag=ocnOnly_flag,
-                              plev=plev,
-                              quiver_flag=quiver_flag,
-                              quiverDs=(dataSets_rg[plotCase]
-                                        if uVar in dataSets_rg[plotCase]
-                                        else dataSets[plotCase]),
-                              quiverDiffDs=(dataSets_rg[diffCase]
-                                            if uVar in dataSets_rg[diffCase]
-                                            else dataSets[diffCase]),
-                              quiverNorm_flag=False,
-                              quiverScale=quiverProps['quiverScale'],
-                              quiverScaleVar=None,
-                              rmRegMean_flag=False,
-                              stampDate_flag=False,
-                              tSteps=tSteps,
-                              tStepLabel_flag=True,
-                              uRef=quiverProps['uRef'],
-                              uVar=uVar,
-                              vVar=vVar,
-                              )
+            (a, ax, c, m) = c1to2p.plotlatlon(
+                (dataSets_rg[plotCase]
+                 if plotVar in dataSets_rg[plotCase]
+                 else dataSets[plotCase]),  # hadIsstDs
+                plotVar,
+                box_flag=False,
+                boxLat=np.array([-3, 3]),
+                boxLon=np.array([180, 220]),
+                caseString=None,
+                cbar_flag=True,
+                # cbar_dy=0.001,
+                cbar_height=0.02,
+                cMap=None,  # 'RdBu_r',
+                compcont_flag=True,
+                diff_flag=diff_flag,
+                diffDs=(dataSets_rg[diffCase]
+                        if plotVar in dataSets_rg[diffCase]
+                        else dataSets[diffCase]),  # gpcpClimoDs,
+                diffPlev=diffPlev,
+                fontSize=12,
+                latLim=latLim,
+                levels=None,  # np.arange(-15, 15.1, 1.5),
+                lonLim=lonLim,
+                ocnOnly_flag=ocnOnly_flag,
+                plev=plev,
+                quiver_flag=quiver_flag,
+                quiverDs=(dataSets_rg[plotCase]
+                          if uVar in dataSets_rg[plotCase]
+                          else dataSets[plotCase]),
+                quiverDiffDs=(dataSets_rg[diffCase]
+                              if uVar in dataSets_rg[diffCase]
+                              else dataSets[diffCase]),
+                quiverNorm_flag=False,
+                quiverScale=quiverProps['quiverScale'],
+                quiverScaleVar=None,
+                rmRegMean_flag=False,
+                stampDate_flag=False,
+                tSteps=tSteps,
+                tStepLabel_flag=True,
+                uRef=quiverProps['uRef'],
+                uVar=uVar,
+                vVar=vVar,
+                )
             # Save figure if requested
             if save_flag:
                 # Set directory for saving
@@ -566,14 +565,11 @@ if __name__ == '__main__':
 # %% Plot map of obs
 
     if plotObsMap_flag:
-        for plotVar in ['PRECT', 'TS']:
+        for plotVar in ['PRECT']:
             uVar = 'TAUX'
             vVar = 'TAUY'
             plev = 200
             diffPlev = plev
-            diff_flag = False  # False
-            plotCase = '125'  # '125'
-            diffCase = '119'  # '119'
             tSteps = np.arange(0, 12)
 
             # Get quiver properties
@@ -600,50 +596,44 @@ if __name__ == '__main__':
                        }[vVar]
 
             # Plot some fields for comparison
-            c1to2p.plotlatlon(obsDs,  # hadIsstDs
-                              obsVar,
-                              box_flag=False,
-                              boxLat=np.array([-3, 3]),
-                              boxLon=np.array([180, 220]),
-                              caseString=None,
-                              cbar_flag=True,
-                              # cbar_dy=0.001,
-                              cbar_height=0.02,
-                              cMap=None,  # 'RdBu_r',
-                              compcont_flag=True,
-                              diff_flag=False,  # diff_flag,
-                              # diffDs=(dataSets_rg[diffCase]
-                              #        if plotVar in dataSets_rg[diffCase]
-                              #        else dataSets[diffCase]),
-                              # diffPlev=diffPlev,
-                              figDims=[6, 3.5],
-                              fontSize=12,
-                              latLim=latLim,  # np.array([-20, 20]),
-                              levels=None,  # np.arange(-15, 15.1, 1.5),
-                              lonLim=lonLim,  # np.array([119.5, 270.5]),
-                              makeFigure_flag=True,
-                              plev=plev,
-                              quiver_flag=False,  # True,
-                              quiverDs=obsQuivDs,
-                              quiverLat=obsQuivDs['lat'],
-                              quiverLon=obsQuivDs['lon'],
-                              # quiverDiffDs=(dataSets_rg[diffCase]
-                              #              if uVar in dataSets_rg[diffCase]
-                              #              else dataSets[diffCase]),
-                              quiverNorm_flag=False,
-                              quiverScale=quiverProps['quiverScale'],
-                              quiverScaleVar=None,
-                              rmRegMean_flag=False,
-                              save_flag=save_flag,
-                              saveDir=(setfilepaths()[2] + saveSubDir +
-                                          'obs_'),
-                              stampDate_flag=False,
-                              tSteps=tSteps,
-                              tStepLabel_flag=True,
-                              uRef=quiverProps['uRef'],
-                              uVar=obsUVar,
-                              vVar=obsVVar,
-                              )
+            (a, ax, c, m) = c1to2p.plotlatlon(
+                obsDs,  # hadIsstDs
+                obsVar,
+                box_flag=False,
+                boxLat=np.array([-3, 3]),
+                boxLon=np.array([180, 220]),
+                caseString=None,
+                cbar_flag=True,
+                # cbar_dy=0.001,
+                cbar_height=0.02,
+                cMap=None,  # 'RdBu_r',
+                compcont_flag=True,
+                diff_flag=False,
+                figDims=[6, 3.5],
+                fontSize=12,
+                latLim=latLim,  # np.array([-20, 20]),
+                levels=None,  # np.arange(-15, 15.1, 1.5),
+                lonLim=lonLim,  # np.array([119.5, 270.5]),
+                makeFigure_flag=True,
+                plev=plev,
+                quiver_flag=False,  # True,
+                quiverDs=obsQuivDs,
+                quiverLat=obsQuivDs['lat'],
+                quiverLon=obsQuivDs['lon'],
+                quiverNorm_flag=False,
+                quiverScale=quiverProps['quiverScale'],
+                quiverScaleVar=None,
+                rmRegMean_flag=False,
+                save_flag=save_flag,
+                saveDir=(setfilepaths()[2] + saveSubDir +
+                         'obs_'),
+                stampDate_flag=False,
+                tSteps=tSteps,
+                tStepLabel_flag=True,
+                uRef=quiverProps['uRef'],
+                uVar=obsUVar,
+                vVar=obsVVar,
+                )
 
 # %% Load and plot GPCP as a test
 

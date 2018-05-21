@@ -206,11 +206,11 @@ def getcasebase(versionId=None,
                 ):
     """
     Get long form nave for a given version ID for cesm1to2 cases
-    
+
     Args:
         versionId - id for the version of interest
     Kwargs:
-        dict_flag - True to return full dictionary rather than one case's value 
+        dict_flag - True to return full dictionary rather than one case's value
     """
     # Define case bases
     casebaseDict =  {'01': 'b.e15.B1850G.f09_g16.pi_control.01',
@@ -566,6 +566,7 @@ def plotbiasrelation(ds,
     # Set index details
     xDs = (ds_rg if xIndex.lower() in ['cpacshear'] else ds)
     yDs = (ds_rg if yIndex.lower() in ['cpacshear'] else ds)
+    # Set default index types
     indexTypes = {'cpacshear': 'testing',
                   'cti': 'Woelfleetal2017',
                   'ditcz': 'Bellucci2010',
@@ -784,6 +785,7 @@ def plotlatlon(ds,
                quiverScale=0.4,
                quiverScaleVar=None,
                quiverUnits='inches',
+               returnM_flag=True,
                rmRegLatLim=None,
                rmRegLonLim=None,
                rmRegMean_flag=False,
@@ -1058,52 +1060,54 @@ def plotlatlon(ds,
             hf.set_size_inches(figDims)
 
     # Plot map
-    im1, ax = mwp.plotmap(ds.lon,
-                          ds.lat,
-                          pData,
-                          box_flag=box_flag,
-                          boxLat=boxLat,
-                          boxLon=boxLon,
-                          caseString=caseString,
-                          cbar_flag=cbar_flag,
-                          cbar_dy=cbar_dy,
-                          cbar_height=cbar_height,
-                          cMap=cMap,
-                          compcont=(compcont
-                                    if compcont_flag
+    im1, ax, hMap = mwp.plotmap(ds.lon,
+                             ds.lat,
+                             pData,
+                             box_flag=box_flag,
+                             boxLat=boxLat,
+                             boxLon=boxLon,
+                             caseString=caseString,
+                             cbar_flag=cbar_flag,
+                             cbar_dy=cbar_dy,
+                             cbar_height=cbar_height,
+                             cMap=cMap,
+                             compcont=(compcont
+                                       if compcont_flag
+                                       else None),
+                             extend=['both', 'max'][plotVar in
+                                                    maxExtendVars],
+                             fill_color=[0.3, 0.3, 0.3],
+                             fontsize=10,  # fontSize,
+                             latlbls=latlbls,
+                             latLim=latLim,
+                             levels=levels,
+                             lonlbls=lonlbls,
+                             lonLim=lonLim,
+                             varName=varName,
+                             varUnits=ds[plotVar].units,
+                             quiver_flag=quiver_flag,
+                             quiverKey_flag=(not quiverNorm_flag),
+                             quiverScale=quiverScale,
+                             quiverUnits=quiverUnits,
+                             returnM_flag=returnM_flag,
+                             U=uData,
+                             Uname=(quiverDs[uVar].name
+                                    if uVar in quiverDs.data_vars
                                     else None),
-                          extend=['both', 'max'][plotVar in maxExtendVars],
-                          fill_color=[0.3, 0.3, 0.3],
-                          fontsize=10,  # fontSize,
-                          latlbls=latlbls,
-                          latLim=latLim,
-                          levels=levels,
-                          lonlbls=lonlbls,
-                          lonLim=lonLim,
-                          varName=varName,
-                          varUnits=ds[plotVar].units,
-                          quiver_flag=quiver_flag,
-                          quiverKey_flag=(not quiverNorm_flag),
-                          quiverScale=quiverScale,
-                          quiverUnits=quiverUnits,
-                          U=uData,
-                          Uname=(quiverDs[uVar].name
-                                 if uVar in quiverDs.data_vars
-                                 else None),
-                          Uunits=((quiverDs[quiverScaleVar].units
-                                   if quiverScaleVar is not None else
-                                   quiverDs[uVar].units)
-                                  if uVar in quiverDs.data_vars
-                                  else None),
-                          Uref=uRef,  # 0.1,
-                          V=vData,
-                          subSamp=((3 if subSamp is None else subSamp)
-                                   # ds['TAUX'].shape[1]/36
-                                   if uVar in quiverDs.data_vars
-                                   else None),
-                          tStepLabel_flag=False,
-                          **kwargs
-                          )
+                             Uunits=((quiverDs[quiverScaleVar].units
+                                      if quiverScaleVar is not None else
+                                      quiverDs[uVar].units)
+                                     if uVar in quiverDs.data_vars
+                                     else None),
+                             Uref=uRef,  # 0.1,
+                             V=vData,
+                             subSamp=((3 if subSamp is None else subSamp)
+                                       # ds['TAUX'].shape[1]/36
+                                       if uVar in quiverDs.data_vars
+                                       else None),
+                             tStepLabel_flag=False,
+                             **kwargs
+                             )
 
     # Add removed regional mean to annotations
     if rmRegMean_flag:
@@ -1190,7 +1194,10 @@ def plotlatlon(ds,
                     shape=np.array([fx, fy]))
         plt.close('all')
 
-    return (im1, ax, compcont)
+    if returnM_flag:
+        return (im1, ax, compcont, hMap)
+    else:
+        return (im1, ax, compcont)
 
 
 def plotmultilatlon(dsDict,

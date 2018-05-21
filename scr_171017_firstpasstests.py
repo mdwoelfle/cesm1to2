@@ -141,6 +141,7 @@ if __name__ == '__main__':
     regrid2file_flag = False
     reload_flag = False
     save_flag = False
+    saveDir = setfilepaths()[2]
     saveSubDir = 'testfigs/66to125/'
     verbose_flag = False
 
@@ -150,8 +151,9 @@ if __name__ == '__main__':
 
     plotBiasRelation_flag = False
     plotIndices_flag = False
-    plotObsMap_flag = True
-    plotOneMap_flag = True
+    plotLonVCentroid_flag = True
+    plotObsMap_flag = False
+    plotOneMap_flag = False
     plotMultiMap_flag = False
     plotGpcpTest_flag = False
     plotRegMean_flag = False
@@ -2046,3 +2048,25 @@ if __name__ == '__main__':
             mwp.savefig(saveDir + saveFile,
                         shape=np.array([fx, fy]))
             # plt.close('all')
+
+# %% Plot precipitation centroid as function of longitude
+    if plotLonVCentroid_flag:
+        plotCaseList = ['125']
+        refDs = dataSets['119']  # gpcpClimoDs
+        if 'PRECT' in refDs:
+            refVar = 'PRECT'
+        elif 'precip' in refDs:
+            refVar = 'precip'
+        c1to2p.plotprecipcentroidvlon([dataSets[jCase]
+                                       for jCase in plotCaseList],
+                                      ['PRECT']*len(plotCaseList),
+                                      closeOnSaving_flag=False,
+                                      contCmap='RdYlGn',
+                                      diff_flag=True,
+                                      makeFigure_flag=True,
+                                      refDs=refDs,
+                                      refVar=refVar,
+                                      yLim=None,
+                                      save_flag=True,  # save_flag,
+                                      saveDir=saveDir + 'atm/centroidstuff/',
+                                      )

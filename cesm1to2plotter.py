@@ -19,7 +19,12 @@ except:
     pass
 
 import matplotlib.pyplot as plt  # import matplotlib for plotting
+import matplotlib.colors as colors  # for getting colors
+import matplotlib.cm as cmx  # for making colors
 import matplotlib.gridspec as gridspec  # pretty subplots
+
+import calendar
+
 
 import mdwtools.mdwfunctions as mwfn  # import personal processing functions
 import mdwtools.mdwplots as mwp       # import personal plotting functions
@@ -746,6 +751,191 @@ def plotbiasrelation(ds,
 
     # Don't return anything for now.
     return
+
+
+def plotprecipcentroidvlon(dsList,
+                           varList,
+                           closeOnSaving_flag=True,
+                           contCmap='RdYlGn',
+                           diff_flag=True,
+                           makeFigure_flag=True,
+                           refDs=None,
+                           refVar=None,
+                           saveDir=None,
+                           save_flag=False,
+                           yLim=None,
+                           ):
+    """
+    Create plot of precipitation centroid at each longitude
+    """
+
+    # Create figure if needed
+    if makeFigure_flag:
+        hf = plt.figure()
+        hf.set_size_inches(10, 3*len(dsList) + 1, forward=True)
+    else:
+        hf = plt.gcf()
+
+    # Create suplot axes
+    gs = gridspec.GridSpec(len(dsList), 2,
+                           width_ratios=[10, 1],
+                           wspace=0,
+                           )
+
+    # Ensure varList is a list
+    # if isinstance(varList, str):
+    #     varList = [varList]*len(dsList)
+
+    for (jDs, ds) in enumerate(dsList):
+        # Compute centroid as fn(longitude) data arrays
+        try:
+            centDa = mwfn.calcdslonprecipcentroid(ds,
+                                                  indexType='areaweight',
+                                                  precipVar=varList[jDs],
+                                                  qc_flag=False,
+                                                  )
+        except KeyError:
+            centDa = mwfn.calcdslonprecipcentroid(ds,
+                                                  indexType='areaweight',
+                                                  precipVar=varList,
+                                                  qc_flag=False,
+                                                  )
+
+        centVals = centDa.values.copy()
+
+        if diff_flag:
+            try:
+                refCentDa = mwfn.calcdslonprecipcentroid(
+                    refDs,
+                    indexType='areaweight',
+                    precipVar=refVar,
+                    qc_flag=False,
+                    )
+                refCentVals = refCentDa.values.copy()
+            except NameError:
+                raise NameError('Must provide refDS and refVar to difference')
+
+        # Subset centVals if needed to match spacing for differencing
+        #   ONLY WORKS WITH GPCP <--> CESM 1 DEGREE!!
+        if diff_flag:
+            if centVals.shape[1] > refCentVals.shape[1]:
+                centVals = centVals[:, np.arange(1, centVals.shape[1], 2)]
+
+        # Get colors for plotting
+        colorIdx = range(centVals.shape[0])
+        cm = plt.get_cmap(contCmap)
+        cNorm = colors.Normalize(vmin=0, vmax=colorIdx[-1])
+        scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=cm)
+
+        # Pull longitudes for plotting
+        if diff_flag:
+            lon = refDs.lon
+        else:
+            lon = ds.lon
+
+        # Plot lon vs dlat plot of centroids for each month
+        plt.subplot(gs[jDs, 0])
+        for mon in range(12):
+            colorVal = scalarMap.to_rgba(colorIdx[mon])
+            plt.plot(lon.values,
+                     centVals[mon, :] -
+                     (refCentVals[mon, :] if diff_flag else 0),
+                     color=colorVal,
+                     label=calendar.month_abbr[colorIdx[mon] + 1],
+                     )
+
+        # Plot lon vs dlat plot of centroids for annual mean
+        plt.plot(lon.values,
+                 centVals.mean(axis=0) -
+                 (refCentVals.mean(axis=0) if diff_flag else 0),
+                 '--k',
+                 label='Ann. Mean')
+
+        # Dress plot
+        plt.xlim([0, 360])
+        plt.xlabel('Longitude')
+        plt.xticks(np.arange(0, 361, 30))
+        plt.ylabel(ds.id +
+                   (('-' + refDs.id) if diff_flag else '') +
+                   ' (deg. latitude)')
+        if yLim is None:
+            yLim = plt.ylim()
+            yLim = [-np.max(np.abs(yLim)), np.max(np.abs(yLim))]
+        plt.ylim(yLim)
+        plt.title(('Bias in p' if diff_flag else 'P') +
+                  'recipitation centroid as function of longitude\n' +
+                  '(' + ds.id +
+                  (('-' + refDs.id) if diff_flag else '') +
+                  ')')
+        plt.grid()
+
+        # Get yticks for second subplot
+        yTicks = plt.yticks()
+
+        # Add legend to last row only
+        if jDs == (len(dsList) - 1):
+            plt.legend(ncol=7, loc=4)
+
+        # Plot zonal mean reference lines of dlat for centroids
+        ax2 = plt.subplot(gs[jDs, 1])
+
+        for mon in range(12):
+            colorVal = scalarMap.to_rgba(colorIdx[mon])
+
+            plt.plot([0, 1],
+                     [centVals[mon, :].mean() -  # *2 to plot line
+                      (refCentVals[mon, :].mean() if diff_flag else 0)]*2,
+                     color=colorVal,
+                     label=None,
+                     )
+        plt.plot([0, 1],
+                 [centVals.mean(axis=0).mean() -
+                  (refCentVals.mean(axis=0).mean() if diff_flag else 0)]*2,
+                 '--k',
+                 label=None)
+        plt.xlim([-1, 2])
+        plt.xticks([])
+        plt.yticks(yTicks[0])
+
+        plt.ylim(yLim)
+        ax2.yaxis.set_ticklabels([])
+
+        plt.grid()
+        for tic in ax2.yaxis.get_major_ticks():
+            tic.tick1On = tic.tick2On = False
+        plt.title('Zonal\nMean')
+
+    # Force everything to fit on the plot
+    plt.tight_layout()
+
+    # Save figure if requested
+    if save_flag:
+        # Set directory for saving
+        if saveDir is None:
+            saveDir = os.path.dirname(os.path.realpath(__file__))
+
+        # Set file name for saving
+        saveFile = (varList[0] +
+                    '_centrVlon_' +
+                    '_'.join([dsList[j].id for j in range(len(dsList))])
+                    )
+        if diff_flag:
+            saveFile = ('d' + saveFile +
+                        '_minus' + refDs.id
+                        )
+
+        # Set saved figure size (inches)
+        fx = hf.get_size_inches()[0]
+        fy = hf.get_size_inches()[1]
+
+        # Save figure
+        print(saveDir + saveFile)
+        mwp.savefig(saveDir + saveFile,
+                    shape=np.array([fx, fy]))
+        if closeOnSaving_flag:
+            plt.close('all')
+
+    return hf
 
 
 def plotlatlon(ds,

@@ -35,7 +35,7 @@ import os  # operating system things.
 # %% Define funcitons as needed
 
 
-def setfilepaths():
+def setfilepaths(newRuns_flag=False):
     """
     Set host specific variables and filepaths
 
@@ -47,6 +47,9 @@ def setfilepaths():
 
     Args:
         N/A
+
+    Kwargs:
+        newRuns_flag - True to change directorys for new runs (on yslogin only!)
 
     Returns:
         ncDir - directory in which netcdf case directories are stored
@@ -68,10 +71,14 @@ def setfilepaths():
         ncSubDir = ''
         saveDir = 'C:\\Users\\woelfle\\Documents\\UW\\CESM\\figs\\'
 
-    elif gethostname()[0:6] in ['yslogi', 'geyser']:
-        ncDir = '/glade/p/cgd/amp/people/hannay/amwg/climo/'
-        ncSubDir = '0.9x1.25/'
-        saveDir = '/glade/p/work/woelfle/figs/cesm1to2/'
+    elif gethostname()[0:6] in ['yslogi', 'geyser', 'cheyen']:
+        if newRuns_flag:
+            ncDir = '/glade/scratch/woelfle/archive/'
+            ncSubDir = 'atm/hist/'
+        else:
+            ncDir = '/glade/p/cgd/amp/people/hannay/amwg/climo/'
+            ncSubDir = '0.9x1.25/'
+        saveDir = '/glade/work/woelfle/figs/cesm1to2/'
 
     return (ncDir, ncSubDir, saveDir)
 
@@ -131,18 +138,19 @@ if __name__ == '__main__':
 
     # Set options/flags
     diff_flag = False
-    loadErai_flag = True  # True to load ERAI fields
-    loadGpcp_flag = True
-    loadHadIsst_flag = True
+    loadErai_flag = False  # True to load ERAI fields
+    loadGpcp_flag = False
+    loadHadIsst_flag = False
     mp_flag = True  # True to use multiprocessing when regridding
+    newRuns_flag = True
     obs_flag = False
     ocnOnly_flag = True  # Need to implement to confirm CTindex is right.
     regridVertical_flag = False
     regrid2file_flag = False
     reload_flag = False
-    save_flag = False
+    save_flag = True
     saveDir = setfilepaths()[2]
-    saveSubDir = 'testfigs/66to125/'
+    saveSubDir = ''  # 'testfigs/66to125/'
     verbose_flag = False
 
     fns_flag = True
@@ -151,9 +159,9 @@ if __name__ == '__main__':
 
     plotBiasRelation_flag = False
     plotIndices_flag = False
-    plotLonVCentroid_flag = True
+    plotLonVCentroid_flag = False
     plotObsMap_flag = False
-    plotOneMap_flag = False
+    plotOneMap_flag = True
     plotMultiMap_flag = False
     plotGpcpTest_flag = False
     plotRegMean_flag = False
@@ -167,10 +175,10 @@ if __name__ == '__main__':
     newVars = 'PRECT'
 
     # Get directory of file to load
-    ncDir, ncSubDir, saveDir = setfilepaths()
+    ncDir, ncSubDir, saveDir = setfilepaths(newRuns_flag)
 
     # Set name(s) of file(s) to load
-    versionIds = ['01',
+    versionIds = [  # '01',
                   # '28',
                   # '36',
                   # 'ga7.66',
@@ -179,24 +187,41 @@ if __name__ == '__main__':
                   # '114',
                   # '116',
                   # '118',
-                  '119',
-                  '125',
+                  # '119',
+                  '119f',
+                  # '125',
+                  '125f',
                   # '161',
                   # '194',
                   # '195'
                   ]
     fileBaseDict = c1to2p.getcasebase()
-    loadSuffixes = ['_' + '{:02d}'.format(mon + 1) + '_climo.nc'
-                    for mon in range(12)]
+    if newRuns_flag:
+        loadSuffixes = ['.cam.h0.' + '{:04d}'.format(yr + 1) +
+                        '-{:02d}'.format(mon+1) + '.nc'
+                        for mon in range(12)
+                        for yr in range(10)]
+    else:
+        loadSuffixes = ['_' + '{:02d}'.format(mon + 1) + '_climo.nc'
+                        for mon in range(12)]
 
     # Create list of files to load
-    loadFileLists = {versionIds[j]: [ncDir + fileBaseDict[versionIds[j]] +
-                                     '/' +
-                                     ncSubDir +
-                                     fileBaseDict[versionIds[j]] +
-                                     loadSuffix
-                                     for loadSuffix in loadSuffixes]
-                     for j in range(len(versionIds))}
+    if newRuns_flag:
+        loadFileLists = {versionIds[j]: [ncDir + fileBaseDict[versionIds[j]] +
+                                         '/' +
+                                         ncSubDir +
+                                         fileBaseDict[versionIds[j]] +
+                                         loadSuffix
+                                         for loadSuffix in loadSuffixes]
+                         for j in range(len(versionIds))}
+    else:
+        loadFileLists = {versionIds[j]: [ncDir + fileBaseDict[versionIds[j]] +
+                                         '/' +
+                                         ncSubDir +
+                                         fileBaseDict[versionIds[j]] +
+                                         loadSuffix
+                                         for loadSuffix in loadSuffixes]
+                         for j in range(len(versionIds))}
 
     # Open netcdf file(s)
     try:
@@ -295,6 +320,7 @@ if __name__ == '__main__':
     # Set variable of interest
     plotVars = ['TS']  # , 'TS', 'TAUX']
 
+    print('--Loading done--')
     # Conver things to reasonable units if needed
 #    newUnits = {'PRECC': 'mm/d',
 #                'PRECL': 'mm/d'}
@@ -459,110 +485,116 @@ if __name__ == '__main__':
     latLbls = np.arange(-30, 31, 10)
     lonLbls = np.arange(120, 271, 30)
 
-    tSteps = np.arange(0, 12)
+    tSteps = np.arange(0, 120)
 
     if plotOneMap_flag:
 
         for plotVar in ['PRECT']:
             plev = 900
             diffPlev = plev
-            diff_flag = False  # False
-            # plotCase = ''  # '125'
-            # diffCase = 'ga7.66'  # '119'
-            plotCase, diffCase = [['01', '01'],
-                                  ['ga7.66', '36'],
-                                  ['119', '36'],
-                                  ['118', 'ga7.66'],
-                                  ['119', '118'],
-                                  ['125', '119'],
-                                  ['125', '36']][5]
-            ocnOnly_flag = False
-            quiver_flag = False
-            uVar = 'TAUX'
-            vVar = 'TAUY'
+            diff_flag = True  # False
+            for plotCase in ['125f']:
+                diffCase = '119f'
+                # plotCase, diffCase = [['01', '01'],
+                #                      ['ga7.66', '36'],
+                #                      ['119', '36'],
+                #                      ['118', 'ga7.66'],
+                #                      ['119', '118'],
+                #                      ['125f', '119f'],
+                #                      ['125', '36']][5]
+                ocnOnly_flag = False
+                quiver_flag = False
+                uVar = 'TAUX'
+                vVar = 'TAUY'
+    
+                # Ensure dataSets_rg exists
+                try:
+                    dataSets_rg[plotCase]
+                except NameError:
+                    dataSets_rg = {jCase: ['foo', 'bar']
+                                   for jCase in list(dataSets.keys())}
+                except KeyError:
+                    dataSets_rg = {jCase: ['foo', 'bar']
+                                   for jCase in list(dataSets.keys())}
+    
+                # Get quiver properties
+                quiverProps = getquiverprops(uVar, vVar, plev,
+                                             diff_flag=diff_flag)
+    
+                # Plot some fields for comparison
+                (a, ax, c, m) = c1to2p.plotlatlon(
+                    (dataSets_rg[plotCase]
+                     if plotVar in dataSets_rg[plotCase]
+                     else dataSets[plotCase]),  # hadIsstDs
+                    plotVar,
+                    box_flag=False,
+                    boxLat=np.array([-3, 3]),
+                    boxLon=np.array([180, 220]),
+                    caseString=None,
+                    cbar_flag=True,
+                    # cbar_dy=0.001,
+                    cbar_height=0.02,
+                    cMap=None,  # 'RdBu_r',
+                    compcont_flag=True,
+                    diff_flag=diff_flag,
+                    diffDs=(dataSets_rg[diffCase]
+                            if plotVar in dataSets_rg[diffCase]
+                            else dataSets[diffCase]),  # gpcpClimoDs,
+                    diffPlev=diffPlev,
+                    fontSize=12,
+                    latLim=latLim,
+                    levels=None,  # np.arange(-15, 15.1, 1.5),
+                    lonLim=lonLim,
+                    ocnOnly_flag=ocnOnly_flag,
+                    plev=plev,
+                    quiver_flag=quiver_flag,
+                    quiverDs=(dataSets_rg[plotCase]
+                              if uVar in dataSets_rg[plotCase]
+                              else dataSets[plotCase]),
+                    quiverDiffDs=(dataSets_rg[diffCase]
+                                  if uVar in dataSets_rg[diffCase]
+                                  else dataSets[diffCase]),
+                    quiverNorm_flag=False,
+                    quiverScale=quiverProps['quiverScale'],
+                    quiverScaleVar=None,
+                    rmRegMean_flag=False,
+                    stampDate_flag=False,
+                    tSteps=tSteps,
+                    tStepLabel_flag=True,
+                    uRef=quiverProps['uRef'],
+                    uVar=uVar,
+                    vVar=vVar,
+                    )
+                # Save figure if requested
+                if save_flag:
+                    # Set directory for saving
+                    if saveDir is None:
+                        saveDir = setfilepaths()[2]
 
-            # Ensure dataSets_rg exists
-            try:
-                dataSets_rg[plotCase]
-            except NameError:
-                dataSets_rg = {jCase: ['foo', 'bar']
-                               for jCase in list(dataSets.keys())}
-            except KeyError:
-                dataSets_rg = {jCase: ['foo', 'bar']
-                               for jCase in list(dataSets.keys())}
-
-            # Get quiver properties
-            quiverProps = getquiverprops(uVar, vVar, plev,
-                                         diff_flag=diff_flag)
-
-            # Plot some fields for comparison
-            (a, ax, c, m) = c1to2p.plotlatlon(
-                (dataSets_rg[plotCase]
-                 if plotVar in dataSets_rg[plotCase]
-                 else dataSets[plotCase]),  # hadIsstDs
-                plotVar,
-                box_flag=False,
-                boxLat=np.array([-3, 3]),
-                boxLon=np.array([180, 220]),
-                caseString=None,
-                cbar_flag=True,
-                # cbar_dy=0.001,
-                cbar_height=0.02,
-                cMap=None,  # 'RdBu_r',
-                compcont_flag=True,
-                diff_flag=diff_flag,
-                diffDs=(dataSets_rg[diffCase]
-                        if plotVar in dataSets_rg[diffCase]
-                        else dataSets[diffCase]),  # gpcpClimoDs,
-                diffPlev=diffPlev,
-                fontSize=12,
-                latLim=latLim,
-                levels=None,  # np.arange(-15, 15.1, 1.5),
-                lonLim=lonLim,
-                ocnOnly_flag=ocnOnly_flag,
-                plev=plev,
-                quiver_flag=quiver_flag,
-                quiverDs=(dataSets_rg[plotCase]
-                          if uVar in dataSets_rg[plotCase]
-                          else dataSets[plotCase]),
-                quiverDiffDs=(dataSets_rg[diffCase]
-                              if uVar in dataSets_rg[diffCase]
-                              else dataSets[diffCase]),
-                quiverNorm_flag=False,
-                quiverScale=quiverProps['quiverScale'],
-                quiverScaleVar=None,
-                rmRegMean_flag=False,
-                stampDate_flag=False,
-                tSteps=tSteps,
-                tStepLabel_flag=True,
-                uRef=quiverProps['uRef'],
-                uVar=uVar,
-                vVar=vVar,
-                )
-            # Save figure if requested
-            if save_flag:
-                # Set directory for saving
-                if saveDir is None:
-                    saveDir = setfilepaths()[2]
-
-                # Set file name for saving
-                tString = 'mon'
-                saveFile = (('d' if diff_flag else '') +
-                            plotVar +
-                            '{:d}'.format(plev) +
-                            '_latlon_' +
-                            tString +
-                            '{:03.0f}'.format(tSteps[0]) + '-' +
-                            '{:03.0f}'.format(tSteps[-1]))
-
-                # Set saved figure size (inches)
-                fx, fy = hf.get_size_inches()
-
-                # Save figure
-                print(saveDir + saveFile)
-                mwp.savefig(saveDir + saveSubDir + saveFile,
-                            shape=np.array([fx, fy]))
-                plt.close('all')
+                    # Set file name for saving
+                    tString = 'mon'
+                    saveFile = (('d' if diff_flag else '') +
+                                plotVar +
+                                '{:d}'.format(plev) +
+                                '_latlon_' +
+                                plotCase +
+                                (('-' + diffCase + '_') if diff_flag else '_') +
+                                tString +
+                                '{:03.0f}'.format(tSteps[0]) + '-' +
+                                '{:03.0f}'.format(tSteps[-1]))
+    
+                    # Set saved figure size (inches)
+                    try: 
+                        fx, fy = hf.get_size_inches()
+                    except NameError:
+                       hf = plt.gcf()
+                       fx, fy = hf.get_size_inches()
+    
+                    # Save figure
+                    print(saveDir + saveFile)
+                    mwp.savefig(saveDir + saveSubDir + saveFile,
+                                shape=np.array([fx, fy]))
+                    plt.close('all')
 
 # %% Plot map of obs
 

@@ -218,23 +218,26 @@ def getcasebase(versionId=None,
         dict_flag - True to return full dictionary rather than one case's value
     """
     # Define case bases
-    casebaseDict =  {'01': 'b.e15.B1850G.f09_g16.pi_control.01',
-                     '28': 'b.e15.B1850G.f09_g16.pi_control.28',
-                     '36': 'b.e15.B1850.f09_g16.pi_control.36',
-                     'ga7.66': 'b.e15.B1850.f09_g16.pi_control.all_ga7.66',
-                     '100': 'b.e15.B1850.f09_g16.pi_control.all.100',
-                     '113': 'b.e15.B1850.f09_g16.pi_control.all.113',
-                     '114': 'b.e15.B1850.f09_g16.pi_control.all.114',
-                     '116': 'b.e15.B1850.f09_g16.pi_control.all.116',
-                     '118': 'b.e15.B1850.f09_g16.pi_control.all.118',
-                     '119': 'b.e15.B1850.f09_g16.pi_control.all.119',
-                     '119f': 'f.2000_DEV.f09_f09.pd_control.119',
-                     '125': 'b.e20.B1850.f09_g16.pi_control.all.125',
-                     '125f': 'f.2000_DEV.f09_f09.pd_control.125',
-                     '161': 'b.e20.BHIST.f09_g17.20thC.161_01',
-                     '194': 'b.e20.B1850.f09_g17.pi_control.all.194',
-                     '195': 'b.e20.B1850.f09_g17.pi_control.all.195',
-                     }
+    casebaseDict = {'01': 'b.e15.B1850G.f09_g16.pi_control.01',
+                    '28': 'b.e15.B1850G.f09_g16.pi_control.28',
+                    '36': 'b.e15.B1850.f09_g16.pi_control.36',
+                    'ga7.66': 'b.e15.B1850.f09_g16.pi_control.all_ga7.66',
+                    '100': 'b.e15.B1850.f09_g16.pi_control.all.100',
+                    '113': 'b.e15.B1850.f09_g16.pi_control.all.113',
+                    '114': 'b.e15.B1850.f09_g16.pi_control.all.114',
+                    '116': 'b.e15.B1850.f09_g16.pi_control.all.116',
+                    '118': 'b.e15.B1850.f09_g16.pi_control.all.118',
+                    '119': 'b.e15.B1850.f09_g16.pi_control.all.119',
+                    '119f': 'f.2000_DEV.f09_f09.pd_control.119',
+                    '119f_gamma': 'f.2000_DEV.f09_f09.pd_gamma.119',
+                    '119f_microp': 'f.2000_DEV.f09_f09.pd_microp.119',
+                    '119f_liqss': 'f.2000_DEV.f09_f09.pd_liqss.119',
+                    '125': 'b.e20.B1850.f09_g16.pi_control.all.125',
+                    '125f': 'f.2000_DEV.f09_f09.pd_control.125',
+                    '161': 'b.e20.BHIST.f09_g17.20thC.161_01',
+                    '194': 'b.e20.B1850.f09_g17.pi_control.all.194',
+                    '195': 'b.e20.B1850.f09_g17.pi_control.all.195',
+                    }
 
     # Return as requested
     if any([dict_flag, versionId is None]):
@@ -308,11 +311,41 @@ def getcolordict():
             '116': '#41f4b2',
             '118': '#f4b541',
             '119': '#9467bd',
+            '119f': '#9467bd',
+            '119f_gamma': '#9467bd',
+            '119f_liqss': '#9467bd',
+            '119f_microp': '#9467bd',
             '125': '#8c564b',
+            '125f': '#8c564b',
             '161': '#e377c2',
             '194': '#7f7f7f',
             '195': '#bcbd22',
-            'obs': [0, 0, 0]}
+            'obs': [0, 0, 0],
+            }
+
+
+def getmarkerdict():
+    return {'01': 'o',
+            '28': 'o',
+            '36': 'o',
+            'ga7.66': 'o',
+            '100': 'o',
+            '113': 'o',
+            '114': 'o',
+            '116': 'o',
+            '118': 'o',
+            '119': 'o',
+            '119f': 's',
+            '119f_gamma': '^',
+            '119f_liqss': 'd',
+            '119f_microp': 'v',
+            '125': 'o',
+            '125f': 's',
+            '161': 'o',
+            '194': 'o',
+            '195': 'o',
+            'obs': 'o',
+            }
 
 
 def getmapcontlevels(plotVar,
@@ -342,7 +375,7 @@ def getmapcontlevels(plotVar,
                       'CLOUD': np.arange(-0.5, 0.51, 0.05),
                       'FLNS': np.arange(-30., 30.1, 3),
                       # 'FNS': np.arange(-600., 600.1, 100),
-                      'FNS': np.arange(-200, 200.1, 20),
+                      'FNS': np.arange(-50, 50.1, 5),
                       'FSNS': np.arange(-50, 50.1, 5.),
                       'LHFLX': np.arange(-50, 50.1, 5),
                       'LWCF': np.arange(-20, 20.1, 2),
@@ -360,6 +393,8 @@ def getmapcontlevels(plotVar,
                       'T': np.arange(-2, 2.1, 0.2),
                       'TAUX': np.arange(-0.1, 0.101, 0.01),
                       'TAUY': np.arange(-0.1, 0.101, 0.01),
+                      'TGCLDIWP': np.arange(-0.03, 0.0301, 0.003),
+                      'TGCLDLWP': np.arange(-0.03, 0.0301, 0.003),
                       'TMQ': np.arange(-10, 10.1, 1),
                       'TS': np.arange(-2, 2.1, 0.2),
                       'U': np.arange(-5, 5.1, 0.5),
@@ -977,7 +1012,7 @@ def plotlatlon(ds,
                quiverScale=0.4,
                quiverScaleVar=None,
                quiverUnits='inches',
-               returnM_flag=True,
+               returnM_flag=True,  # MUST be true for now (bug)
                rmRegLatLim=None,
                rmRegLonLim=None,
                rmRegMean_flag=False,
@@ -1031,6 +1066,10 @@ def plotlatlon(ds,
         tSteps = np.arange(0, ds[plotVar].shape[0], dtype=int)
     if diffTSteps is None:
         diffTSteps = tSteps
+    if verbose_flag:
+        print(tSteps)
+        if diff_flag:
+            print(diffTSteps)
 
     # Determine differencing pressure level if not provided
     if diffPlev is None:
@@ -1250,56 +1289,60 @@ def plotlatlon(ds,
         hf = plt.figure()
         if figDims is not None:
             hf.set_size_inches(figDims)
+        hf.canvas.set_window_title(ds.id +
+                                   ('-' + diffDs.id
+                                    if diff_flag else '') +
+                                   ': ' + plotVar + ' (latlon)')
 
     # Plot map
     im1, ax, hMap = mwp.plotmap(ds.lon,
-                             ds.lat,
-                             pData,
-                             box_flag=box_flag,
-                             boxLat=boxLat,
-                             boxLon=boxLon,
-                             caseString=caseString,
-                             cbar_flag=cbar_flag,
-                             cbar_dy=cbar_dy,
-                             cbar_height=cbar_height,
-                             cMap=cMap,
-                             compcont=(compcont
-                                       if compcont_flag
-                                       else None),
-                             extend=['both', 'max'][plotVar in
-                                                    maxExtendVars],
-                             fill_color=[0.3, 0.3, 0.3],
-                             fontsize=10,  # fontSize,
-                             latlbls=latlbls,
-                             latLim=latLim,
-                             levels=levels,
-                             lonlbls=lonlbls,
-                             lonLim=lonLim,
-                             varName=varName,
-                             varUnits=ds[plotVar].units,
-                             quiver_flag=quiver_flag,
-                             quiverKey_flag=(not quiverNorm_flag),
-                             quiverScale=quiverScale,
-                             quiverUnits=quiverUnits,
-                             returnM_flag=returnM_flag,
-                             U=uData,
-                             Uname=(quiverDs[uVar].name
-                                    if uVar in quiverDs.data_vars
-                                    else None),
-                             Uunits=((quiverDs[quiverScaleVar].units
-                                      if quiverScaleVar is not None else
-                                      quiverDs[uVar].units)
-                                     if uVar in quiverDs.data_vars
-                                     else None),
-                             Uref=uRef,  # 0.1,
-                             V=vData,
-                             subSamp=((3 if subSamp is None else subSamp)
-                                       # ds['TAUX'].shape[1]/36
+                                ds.lat,
+                                pData,
+                                box_flag=box_flag,
+                                boxLat=boxLat,
+                                boxLon=boxLon,
+                                caseString=caseString,
+                                cbar_flag=cbar_flag,
+                                cbar_dy=cbar_dy,
+                                cbar_height=cbar_height,
+                                cMap=cMap,
+                                compcont=(compcont
+                                          if compcont_flag
+                                          else None),
+                                extend=['both', 'max'][plotVar in
+                                                       maxExtendVars],
+                                fill_color=[0.3, 0.3, 0.3],
+                                fontsize=10,  # fontSize,
+                                latlbls=latlbls,
+                                latLim=latLim,
+                                levels=levels,
+                                lonlbls=lonlbls,
+                                lonLim=lonLim,
+                                varName=varName,
+                                varUnits=ds[plotVar].units,
+                                quiver_flag=quiver_flag,
+                                quiverKey_flag=(not quiverNorm_flag),
+                                quiverScale=quiverScale,
+                                quiverUnits=quiverUnits,
+                                returnM_flag=returnM_flag,
+                                U=uData,
+                                Uname=(quiverDs[uVar].name
                                        if uVar in quiverDs.data_vars
                                        else None),
-                             tStepLabel_flag=False,
-                             **kwargs
-                             )
+                                Uunits=((quiverDs[quiverScaleVar].units
+                                         if quiverScaleVar is not None else
+                                         quiverDs[uVar].units)
+                                        if uVar in quiverDs.data_vars
+                                        else None),
+                                Uref=uRef,  # 0.1,
+                                V=vData,
+                                subSamp=((3 if subSamp is None else subSamp)
+                                         # ds['TAUX'].shape[1]/36
+                                         if uVar in quiverDs.data_vars
+                                         else None),
+                                tStepLabel_flag=False,
+                                **kwargs
+                                )
 
     # Add removed regional mean to annotations
     if rmRegMean_flag:
@@ -1409,6 +1452,7 @@ def plotmultilatlon(dsDict,
                     latlbls=None,
                     lonLim=np.array([119.5, 270.5]),
                     lonlbls=None,
+                    obsDs=None,
                     plev=None,
                     quiver_flag=False,
                     quiverScale=0.4,
@@ -1452,22 +1496,75 @@ def plotmultilatlon(dsDict,
     if isinstance(box_flag, bool):
         box_flag = [box_flag]*len(plotIdList)
 
+    # Set obs properties if needed
+    if 'obs' in plotIdList:
+        obsVar = {'OMEGA': 'w',
+                  'PRECT': 'precip',
+                  'TAUX': 'iews',
+                  'TS': 'sst',
+                  }[plotVar]
+        # obsQuivDs = {'TAUX': eraiDs,
+        #              'U': erai3dDs}[uVar]
+        # obsUVar = {'TAUX': 'iews',
+        #            'U': 'u',
+        #            }[uVar]
+        # obsVVar = {'TAUY': 'inss',
+        #            'V': 'v',
+        #            }[vVar]
+
     # Create figure for plotting
     hf = plt.figure()
+    if len(plotIdList) == 2:
+        if cbarOrientation == 'vertical':
+            # Set figure window size
+            hf.set_size_inches(9, 2, forward=True)
+
+            # Set up subplots
+            gs = gridspec.GridSpec(1, 3,
+                                   # height_ratios=[20, 1, 20, 1, 20],
+                                   # hspace=0.3,
+                                   width_ratios=[30, 30, 1],
+                                   )
+            gs.update(left=0.07, right=0.95, top=0.95, bottom=0.05)
+
+            # Set gridspec colorbar location
+            cbColInd = 2
+            cbRowInd = 0
+            cbar_xoffset = -0.04
+
+        elif cbarOrientation == 'horizontal':
+            # Set figure window size
+            hf.set_size_inches(7.5, 4, forward=True)
+
+            # Set up subplots
+            gs = gridspec.GridSpec(2, 2,
+                                   height_ratios=[20, 1],
+                                   )
+
+            # Set gridspec colorbar location
+            cbColInd = 0
+            cbRowInd = 1
+
+        # Set gridpsec index order
+        colInds = [0, 1]
+        rowInds = [0, 0]
     if len(plotIdList) == 3:
         if cbarOrientation == 'vertical':
             # Set figure window size
-            hf.set_size_inches(9, 10, forward=True)
+            hf.set_size_inches(9, 8, forward=True)
 
             # Set up subplots
-            gs = gridspec.GridSpec(5, 2,
-                                   height_ratios=[20, 1, 20, 1, 20],
+            gs = gridspec.GridSpec(3, 2,
+                                   # height_ratios=[20, 1, 20, 1, 20],
+                                   hspace=0.3,
                                    width_ratios=[30, 1],
                                    )
+            gs.update(left=0.07, right=0.95, top=0.95, bottom=0.05)
 
             # Set gridspec colorbar location
             cbColInd = 1
             cbRowInd = 0
+            cbar_xoffset = -0.04
 
         elif cbarOrientation == 'horizontal':
             # Set figure window size
@@ -1484,7 +1581,51 @@ def plotmultilatlon(dsDict,
 
         # Set gridpsec index order
         colInds = [0, 0, 0]
-        rowInds = [0, 2, 4]
+        rowInds = [0, 1, 2]
+
+    elif len(plotIdList) == 4:
+        if cbarOrientation == 'vertical':
+            # Set figure window size
+            hf.set_size_inches(9, 3, forward=True)
+
+            # Set up subplots
+            gs = gridspec.GridSpec(2, 3,
+                                   # height_ratios=[20, 1, 20, 1, 20],
+                                   hspace=0.1,
+                                   width_ratios=[30, 30, 1],
+                                   )
+            gs.update(left=0.05, right=0.92, top=0.95, bottom=0.05)
+
+            # Set gridpsec index order
+            colInds = [0, 1, 0, 1]
+            rowInds = [0, 0, 1, 1]
+            cbar_xoffset = -0.04
+
+            # Set gridspec colorbar location
+            cbColInd = 2
+            cbRowInd = 0
+
+    elif len(plotIdList) == 6:
+        if cbarOrientation == 'vertical':
+            # Set figure window size
+            hf.set_size_inches(10, 6, forward=True)
+
+            # Set up subplots
+            gs = gridspec.GridSpec(3, 3,
+                                   # height_ratios=[20, 1, 20, 1, 20],
+                                   hspace=0.3,
+                                   width_ratios=[30, 30, 1],
+                                   )
+            gs.update(left=0.05, right=0.92, top=0.95, bottom=0.05)
+
+            # Set gridpsec index order
+            colInds = [0, 0, 0, 1, 1, 1]
+            rowInds = [0, 1, 2, 0, 1, 2]
+
+            # Set gridspec colorbar location
+            cbColInd = 2
+            cbRowInd = 0
+
     elif len(plotIdList) == 9:
         if cbarOrientation == 'vertical':
             # Set figure window size
@@ -1508,6 +1649,8 @@ def plotmultilatlon(dsDict,
             # Set gridspec colorbar location
             cbColInd = 3
             cbRowInd = 0
+            cbar_xoffset = -0.01
+
         elif cbarOrientation == 'horizontal':
             # Set figure window size
             hf.set_size_inches(14, 12, forward=True)
@@ -1534,10 +1677,17 @@ def plotmultilatlon(dsDict,
                                )
 
     # Plot maps
+    skippedPlotCount = 0
     for jSet, plotId in enumerate(plotIdList):
+        if plotId is None:
+            skippedPlotCount = skippedPlotCount + 1
+            print('skipping {:d}'.format(jSet))
+            continue
         plt.subplot(gs[rowInds[jSet], colInds[jSet]])
         if diff_flag:
-            im1, ax, compcont = plotlatlon(
+            diffId = diffIdList[jSet]
+            print(plotId + ' - ' + diffId)
+            im1, ax, compcont, _ = plotlatlon(
                 dsDict[plotId],
                 plotVar,
                 box_flag=box_flag[jSet],
@@ -1560,9 +1710,6 @@ def plotmultilatlon(dsDict,
                 quiver_flag=quiver_flag,
                 quiverScale=quiverScale,
                 quiverUnits=quiverUnits,
-                # rmRegLatLim=rmRegLatLim,
-                # rmRegLonLim=rmRegLonLim,
-                # rmRegMean_flag=rmRegMean_flag,
                 rmse_flag=rmse_flag,
                 save_flag=False,
                 stampDate_flag=stampDate_flag,
@@ -1571,33 +1718,66 @@ def plotmultilatlon(dsDict,
                 **kwargs
                 )
         else:
-            im1, ax, compcont = plotlatlon(
-                dsDict[plotId],
-                plotVar,
-                box_flag=box_flag[jSet],
-                cbar_flag=False,
-                compcont_flag=compcont_flag,
-                diff_flag=False,
-                fontSize=fontSize,
-                latLim=latLim,
-                latlbls=latlbls,
-                lonLim=lonLim,
-                lonlbls=lonlbls,
-                makeFigure_flag=False,
-                plev=plev,
-                quiver_flag=quiver_flag,
-                quiverScale=quiverScale,
-                quiverUnits=quiverUnits,
-                # rmRegMean_flag=rmRegMean_flag,
-                save_flag=False,
-                stampDate_flag=stampDate_flag,
-                tSteps=tSteps,
-                tStepLabel_flag=(jSet == 0),
-                **kwargs
-                )
+            print(plotId)
+            if plotId == 'obs':
+                (a, ax, c, m) = plotlatlon(
+                    obsDs,  # hadIsstDs
+                    obsVar,
+                    box_flag=box_flag[jSet],
+                    cbar_flag=False,
+                    compcont_flag=compcont_flag,
+                    diff_flag=False,
+                    fontSize=fontSize,
+                    latLim=latLim,  # np.array([-20, 20]),
+                    latlbls=latlbls,
+                    lonLim=lonLim,  # np.array([119.5, 270.5]),
+                    lonlbls=lonlbls,
+                    makeFigure_flag=False,
+                    plev=plev,
+                    quiver_flag=False,  # True,
+                    # quiverDs=obsQuivDs,
+                    # quiverLat=obsQuivDs['lat'],
+                    # quiverLon=obsQuivDs['lon'],
+                    # quiverNorm_flag=False,
+                    # quiverScale=quiverProps['quiverScale'],
+                    # quiverScaleVar=None,
+                    save_flag=False,
+                    stampDate_flag=stampDate_flag,
+                    tSteps=tSteps,
+                    tStepLabel_flag=(jSet == 0),
+                    **kwargs
+                    )
+            else:
+                im1, ax, compcont, _ = plotlatlon(
+                    dsDict[plotId],
+                    plotVar,
+                    box_flag=box_flag[jSet],
+                    cbar_flag=False,
+                    compcont_flag=compcont_flag,
+                    diff_flag=False,
+                    fontSize=fontSize,
+                    latLim=latLim,
+                    latlbls=latlbls,
+                    lonLim=lonLim,
+                    lonlbls=lonlbls,
+                    makeFigure_flag=False,
+                    plev=plev,
+                    quiver_flag=quiver_flag,
+                    quiverScale=quiverScale,
+                    quiverUnits=quiverUnits,
+                    save_flag=False,
+                    stampDate_flag=stampDate_flag,
+                    tSteps=tSteps,
+                    tStepLabel_flag=(jSet == 0),
+                    **kwargs
+                    )
 
         # Add subplot label (subfigure number)
-        ax.annotate('(' + chr(jSet + ord(subFigCountStart)) + ')',
+        ax.annotate('(' + chr(jSet +
+                              ord(subFigCountStart) -
+                              skippedPlotCount
+                              ) +
+                    ')',
                     # xy=(-0.12, 1.09),
                     xy=(-0.08, 1.07),
                     xycoords='axes fraction',
@@ -1605,6 +1785,10 @@ def plotmultilatlon(dsDict,
                     verticalalignment='bottom',
                     fontweight='bold',
                     )
+
+        # Get id for a good plot for colorbar making
+        if plotId != 'obs':
+            goodPlotId = plotId
 
     # Add common colorbar
     # Create axis for colorbar
@@ -1627,9 +1811,10 @@ def plotmultilatlon(dsDict,
                                )
         pcb = cbar_ax.get_position()
 
+        # Get variable name for colorbar
+        varName = mwp.getplotvarstring(dsDict[goodPlotId][plotVar].name)
         # Get variable name for colorbar label
-        varName = mwp.getplotvarstring(dsDict[plotIdList[0]][plotVar].name)
-        if np.ndim(dsDict[plotIdList[0]][plotVar]) == 4:
+        if np.ndim(dsDict[goodPlotId][plotVar]) == 4:
             # Add level if original field is 4d
             varName = varName + str(plev)
         if all([diff_flag, plev != diffPlev]):
@@ -1640,7 +1825,8 @@ def plotmultilatlon(dsDict,
         # Create colorbar
         if cbarOrientation == 'vertical':
             # Place colorbar on figure
-            cbar_ax.set_position([pcb.x0-0.01, pcb.y0 + pcb.height/6.,
+            cbar_ax.set_position([pcb.x0 + cbar_xoffset,
+                                  pcb.y0 + pcb.height/6.,
                                   0.015, pcb.height*2./3.])
 
             # Label colorbar with variable name and units
@@ -1648,7 +1834,7 @@ def plotmultilatlon(dsDict,
                 (r'$\Delta$' if diff_flag else '') +
                 varName + ' (' +
                 mwfn.getstandardunitstring(
-                    dsDict[plotIdList[0]][plotVar].units) +
+                    dsDict[goodPlotId][plotVar].units) +
                 ')')
 
         elif cbarOrientation == 'horizontal':
@@ -1660,7 +1846,8 @@ def plotmultilatlon(dsDict,
             cbar_ax.set_xlabel(
                 (r'$\Delta$' if diff_flag else '') +
                 varName + ' (' +
-                mwfn.getstandardunit(dsDict[plotIdList[0]][plotVar].units) +
+                mwfn.getstandardunitstring(
+                    dsDict[goodPlotId][plotVar].units) +
                 ')')
 
         # Add colorbar ticks and ensure compcont is labeled
@@ -1714,14 +1901,14 @@ def plotmultilatlon(dsDict,
                 diffStr = ''
             # Get variable name for saving
             varName = plotVar
-            if np.ndim(dsDict[plotIdList[0]][plotVar]) == 4:
+            if np.ndim(dsDict[goodPlotId][plotVar]) == 4:
                 # Add level if original field is 4d
                 varName = varName + str(plev)
             if plev != diffPlev:
                 # Add differencing of levels if plotting differences and
                 #   plev and diffPlev are not the same (for plotting shears)
                 varName = varName + '-' + str(diffPlev)
-            saveFile = (varName +
+            saveFile = ('d' + varName +
                         '_latlon_comp{:d}_'.format(len(plotIdList)) +
                         diffStr +
                         tString +
@@ -1731,7 +1918,7 @@ def plotmultilatlon(dsDict,
             if len(plotIdList) > 3:
                 caseSaveString = 'comp{:d}'.format(len(plotIdList))
             else:
-                caseSaveString = '_'.join([plotIdList])
+                caseSaveString = '_'.join(plotIdList)
             saveFile = (
                 plotVar + '_latlon_' +
                 caseSaveString + '_' +

@@ -374,6 +374,7 @@ def getmapcontlevels(plotVar,
                       'CLDTOT': np.arange(-0.5, 0.51, 0.05),
                       'CLOUD': np.arange(-0.5, 0.51, 0.05),
                       'FLNS': np.arange(-30., 30.1, 3),
+                      'FLUT': np.arange(-15, 15.1, 1.5),
                       # 'FNS': np.arange(-600., 600.1, 100),
                       'FNS': np.arange(-50, 50.1, 5),
                       'FSNS': np.arange(-50, 50.1, 5.),
@@ -385,7 +386,7 @@ def getmapcontlevels(plotVar,
                       'PBLH': np.arange(-150, 150.1, 15),
                       'PRECC': np.arange(-10, 10.1, 1),
                       'PRECL': np.arange(-10, 10.1, 1),
-                      'PRECT': np.arange(-10, 10.1, 1),
+                      'PRECT': np.arange(-5, 5.01, 0.5),
                       'PS': np.arange(-4., 4.01, 0.5),
                       'PSL': np.arange(-4, 4.01, 0.5),
                       'SHFLX': np.arange(-10, 10.1, 1.),
@@ -1008,6 +1009,7 @@ def plotlatlon(ds,
                quiver_flag=False,
                quiverDs=None,
                quiverDiffDs=None,
+               quiverKey_flag=True,
                quiverNorm_flag=False,
                quiverScale=0.4,
                quiverScaleVar=None,
@@ -1321,7 +1323,8 @@ def plotlatlon(ds,
                                 varName=varName,
                                 varUnits=ds[plotVar].units,
                                 quiver_flag=quiver_flag,
-                                quiverKey_flag=(not quiverNorm_flag),
+                                quiverKey_flag=((not quiverNorm_flag) and
+                                                quiverKey_flag),
                                 quiverScale=quiverScale,
                                 quiverUnits=quiverUnits,
                                 returnM_flag=returnM_flag,
@@ -1447,6 +1450,7 @@ def plotmultilatlon(dsDict,
                     diffDs=None,
                     diffPlev=None,
                     diffVar=None,
+                    figSize=None,
                     fontSize=12,
                     latLim=np.array([-30, 30]),
                     latlbls=None,
@@ -1586,7 +1590,11 @@ def plotmultilatlon(dsDict,
     elif len(plotIdList) == 4:
         if cbarOrientation == 'vertical':
             # Set figure window size
-            hf.set_size_inches(9, 3, forward=True)
+            if figSize is None:
+                hf.set_size_inches(9, 3, forward=True)
+            else:
+                hf.set_size_inches(figSize[0], figSize[1],
+                                   forward=True)
 
             # Set up subplots
             gs = gridspec.GridSpec(2, 3,
@@ -1625,6 +1633,7 @@ def plotmultilatlon(dsDict,
             # Set gridspec colorbar location
             cbColInd = 2
             cbRowInd = 0
+            cbar_xoffset = -0.02
 
     elif len(plotIdList) == 9:
         if cbarOrientation == 'vertical':
@@ -1686,7 +1695,7 @@ def plotmultilatlon(dsDict,
         plt.subplot(gs[rowInds[jSet], colInds[jSet]])
         if diff_flag:
             diffId = diffIdList[jSet]
-            print(plotId + ' - ' + diffId)
+            # print(plotId + ' - ' + diffId)
             im1, ax, compcont, _ = plotlatlon(
                 dsDict[plotId],
                 plotVar,
@@ -1708,6 +1717,7 @@ def plotmultilatlon(dsDict,
                 makeFigure_flag=False,
                 plev=plev,
                 quiver_flag=quiver_flag,
+                quiverKey_flag=(jSet == 0),
                 quiverScale=quiverScale,
                 quiverUnits=quiverUnits,
                 rmse_flag=rmse_flag,
@@ -1718,7 +1728,7 @@ def plotmultilatlon(dsDict,
                 **kwargs
                 )
         else:
-            print(plotId)
+            # print(plotId)
             if plotId == 'obs':
                 (a, ax, c, m) = plotlatlon(
                     obsDs,  # hadIsstDs
@@ -1763,6 +1773,7 @@ def plotmultilatlon(dsDict,
                     makeFigure_flag=False,
                     plev=plev,
                     quiver_flag=quiver_flag,
+                    quiverKey_flag=(jSet == 0),
                     quiverScale=quiverScale,
                     quiverUnits=quiverUnits,
                     save_flag=False,
@@ -2400,5 +2411,751 @@ def plotmultizonregmeanlines(dsDict,
                     shape=np.array([fx, fy]))
         plt.close('all')
 
+# %%
+
+
+def plotpressurelat(ds,
+                    colorVar,
+                    # caseString=None,
+                    cbar_flag=True,
+                    cbar_dy=-0.1,
+                    cbar_height=0.02,
+                    cMap=None,
+                    colorConts=None,
+                    dCont_flag=False,
+                    dContCase=None,
+                    diff_flag=False,
+                    diffDs=None,
+                    dt=1,
+                    latLbls=None,
+                    latLim=np.array([-30, 30]),
+                    latSubSamp=3,
+                    logP_flag=True,
+                    lonLim=np.array([240, 270]),
+                    lineCont_flag=False,
+                    lineContDiff_flag=None,
+                    lineConts=None,
+                    lineContVar=None,
+                    lineContDs=None,
+                    lineContDiffDs=None,
+                    makeFigure_flag=True,
+                    pLbls=None,
+                    pLim=np.array([1000, 200]),
+                    quiver_flag=True,
+                    quiverKey_flag=True,
+                    quiverScale=3,
+                    quiverUnits='inches',
+                    save_flag=False,
+                    saveDir=None,
+                    saveSubDir=None,
+                    tLim=np.array([0, 12]),
+                    tLimLabel_flag=True,
+                    wScale=100,
+                    ):
+
+    # Set datasets for plotting with black contours
+    if lineCont_flag:
+        if lineContDs is None:
+            lineContDs = ds
+        if lineContDiff_flag is None:
+            lineContDiff_flag = diff_flag
+        if lineContDiff_flag and (lineContDiffDs is None):
+                lineContDiffDs = diffDs
+
+    # Compute zonal mean over requested longitudes
+    dsZm = ds.loc[
+        dict(lon=slice(lonLim[0], lonLim[-1]),
+             lat=slice(latLim[0]-2, latLim[-1]+2))
+        ].mean(dim='lon')
+    if diff_flag:
+        diffDsZm = diffDs.loc[
+            dict(lon=slice(lonLim[0], lonLim[-1]),
+                 lat=slice(latLim[0]-2, latLim[-1]+2))
+            ].mean(dim='lon')
+    if lineCont_flag:
+        lineDsZm = lineContDs.loc[
+            dict(lon=slice(lonLim[0], lonLim[-1]),
+                 lat=slice(latLim[0]-2, latLim[-1]+2))
+            ].mean(dim='lon')
+    if lineContDiff_flag:
+        lineDiffDsZm = lineContDiffDs.loc[
+            dict(lon=slice(lonLim[0], lonLim[-1]),
+                 lat=slice(latLim[0]-2, latLim[-1]+2))
+            ].mean(dim='lon')
+
+    # Mean data over requested plotting time period
+    dsZm = dsZm.isel(time=slice(tLim[0], tLim[-1], dt)).mean(dim='time')
+    if diff_flag:
+        diffDsZm = diffDsZm.isel(
+            time=slice(tLim[0], tLim[-1], dt)).mean(dim='time')
+    if lineCont_flag:
+        lineDsZm = lineDsZm.isel(
+            time=slice(tLim[0], tLim[-1], dt)).mean(dim='time')
+    if lineContDiff_flag:
+        lineDiffDsZm = lineDiffDsZm.isel(
+            time=slice(tLim[0], tLim[-1], dt)).mean(dim='time')
+
+    # Get contours for plotting filled contours
+    if colorConts is None:
+        try:
+            if diff_flag:
+                colorConts = {
+                    'AREI': np.arange(-10, 10.1, 1),
+                    'AREL': np.arange(-2, 2.1, 0.2),
+                    'AWNC': np.arange(-1e7, 1.01e7, 1e6),
+                    'AWNI': np.arange(-1e4, 1.01e4, 1e4),
+                    'CLDICE': np.arange(-3e-6, 3.01e-6, 3e-7),
+                    'CLDLIQ': np.arange(-4e-5, 4.01e-5, 4e-6),
+                    'CLOUD': np.arange(-0.2, 0.201, 0.02),
+                    'ICIMR': np.arange(-3e-6, 3.01e-6, 3e-7),
+                    'ICWMR': np.arange(-1e-4, 1.01e-4, 1e-5),
+                    'OMEGA': (np.arange(-0.03, 0.03001, 0.003)),
+                    'RELHUM': np.arange(-20, 20.1, 2),
+                    'T': np.arange(-2, 2.1, 0.2),
+                    'U': np.arange(-5, 5.01, 0.5),
+                    'V': np.arange(-1, 1.01, 0.1),
+                    }[colorVar]
+            else:
+                colorConts = {
+                    'CLOUD': np.arange(0, 0.301, 0.02),
+                    'RELHUM': np.arange(0, 100.1, 5),
+                    'T': np.arange(225, 295.1, 5),
+                    'V': np.arange(-4, 4.1, 0.5),
+                    'Z3': np.arange(0, 15001, 1000),
+                    }[colorVar]
+        except KeyError:
+            colorConts = None
+
+    # Get contours for plotting lined contours
+    try:
+        if lineContDiff_flag:
+            lineConts = {
+                'AREL': np.arange(-2, 2.1, 0.2),
+                'CLOUD': np.arange(-0.2, 0.201, 0.02),
+                'RELHUM': np.arange(-20, 20.1, 2),
+                'T': np.arange(-2, 2.1, 0.2),
+                'V': np.arange(-3, 3.1, 0.3),
+                }[lineContVar]
+        else:
+            lineConts = {
+                'CLOUD': np.arange(0, 0.301, 0.05),
+                'RELHUM': np.arange(0, 100.1, 10),
+                'T': np.arange(225, 295.1, 10),
+                'V': np.arange(-4, 4.1, 0.5),
+                'Z3': np.arange(0, 15001, 1500),
+                }[lineContVar]
+    except KeyError:
+        lineConts = None
+
+    # Create figure for plotting
+    if makeFigure_flag:
+        hf = plt.figure()
+        hf.canvas.set_window_title(
+            ds.id +
+            ('-{:s}'.format(diffDs.id) if diff_flag
+             else ''))
+
+    # Plot meridional mean slice with filled contours
+    if colorConts is None:
+        cset1 = plt.contourf(dsZm['lat'],
+                             (np.log10(dsZm['plev'])
+                              if logP_flag
+                              else dsZm['plev']),
+                             dsZm[colorVar] -
+                             (diffDsZm[colorVar] if diff_flag
+                              else 0),
+                             cmap=mwp.getcmap(colorVar,
+                                              diff_flag=diff_flag),
+                             extend='both')
+    else:
+        cset1 = plt.contourf(
+            dsZm['lat'],
+            (np.log10(dsZm['plev'])
+             if logP_flag
+             else dsZm['plev']),
+            dsZm[colorVar] -
+            (diffDsZm[colorVar] if diff_flag
+             else 0),
+            colorConts,
+            cmap=mwp.getcmap(colorVar,
+                             diff_flag=diff_flag),
+            extend='both')
+
+    # Plot meridional mean slice with black contours
+    if lineCont_flag:
+        cset2 = plt.contour(lineDsZm['lat'],
+                            (np.log10(lineDsZm['plev'])
+                             if logP_flag
+                             else lineDsZm['plev']),
+                            lineDsZm[lineContVar] -
+                            (lineDiffDsZm[lineContVar] if lineContDiff_flag
+                             else 0),
+                            lineConts,
+                            colors='k')
+        plt.clabel(cset2)
+
+    # Compute vector field if requested
+    if quiver_flag:
+        R = 287.058  # [J/kg/K]
+        g = 9.80662  # [m/s^2]
+
+        # Compute w
+        dsW = (-dsZm['OMEGA']*R*dsZm['T'] /
+               (dsZm['plev']*100*g))  # *100 converts hPa to Pa
+        if diff_flag:
+            diffDsW = (-diffDsZm['OMEGA']*R*diffDsZm['T'] /
+                       (diffDsZm['plev']*100*g))  # *100 converts hPa to Pa
+
+        # Plot quivers
+        q1 = plt.quiver(dsZm['lat'][::latSubSamp],
+                        (np.log10(dsZm['plev'])
+                         if logP_flag
+                         else dsZm['plev']),
+                        dsZm['V'][:, ::latSubSamp] -
+                        (diffDsZm['V'][:, ::latSubSamp] if diff_flag
+                         else 0),
+                        wScale*(dsW[:, ::latSubSamp] -
+                                (diffDsW[:, ::latSubSamp] if diff_flag
+                                 else 0)
+                                ),
+                        units=quiverUnits,
+                        scale=quiverScale
+                        )
+        # Ad quiver key (reference vector)
+        if quiverKey_flag:
+            plt.quiverkey(q1, 0.3, 1.05,
+                          1,
+                          '[v ({:d} {:s}), '.format(
+                              1,
+                              mwfn.getstandardunitstring('m/s')) +
+                          'w ({:0.0e} {:s})]'.format(
+                              1/wScale,
+                              mwfn.getstandardunitstring('m/s')),
+                          coordinates='axes',
+                          labelpos='E')
+
+    # Dress plot
+    ax = plt.gca()
+    # Flip y direction
+    ax.invert_yaxis()
+
+    # Set x and y limits
+    plt.xlim(latLim)
+
+    # Set labels on x axis
+    if latLbls is not None:
+        plt.xticks(latLbls)
+
+    # Set y axis to adjust for logP if requested
+    if logP_flag:
+        plt.ylim(np.log10(pLim))
+        if pLbls is None:
+            pLbls = np.arange(1000, 199, -100)
+        plt.yticks(np.log10(pLbls),
+                   pLbls)
+    else:
+        plt.ylim(pLim)
+
+    # Label axes
+    plt.xlabel('Latitude')
+    plt.ylabel('Pressure ({:s})'.format(dsZm['plev'].units))
+
+    # Add colorbar
+    if cbar_flag:
+        hcb = plt.colorbar(cset1,
+                           label='{:s} ({:s})'.format(
+                               mwp.getplotvarstring(colorVar),
+                               ds[colorVar].units))
+        if colorVar == 'OMEGA':
+            plt.annotate('(up)',
+                         xy=(0.85, 0.1),
+                         xycoords='figure fraction',
+                         horizontalalignment='right',
+                         verticalalignment='bottom')
+
+    # Add case number
+    ax.annotate(ds.id +
+                ('-{:s}'.format(diffDs.id) if diff_flag
+                 else ''),
+                xy=[0, 1],
+                xycoords='axes fraction',
+                horizontalalignment='left',
+                verticalalignment='bottom')
+
+    # Add time range
+    if tLimLabel_flag:
+        tStepString = 't = [{:0d}, {:0d}]'.format(tLim[0], tLim[-1]-1)
+        ax.annotate(tStepString,
+                    xy=[1, 1],
+                    xycoords='axes fraction',
+                    horizontalalignment='right',
+                    verticalalignment='bottom')
+
+    if save_flag:
+        # Set directory for saving
+        if saveDir is None:
+            saveDir = os.path.dirname(os.path.realpath(__file__))
+
+        # Set filename for saving
+        saveFile = (('d' if diff_flag else '') +
+                    colorVar +
+                    ('_VW' if quiver_flag else '') +
+                    '_' + ds.id +
+                    ('-{:s}'.format(diffDs.id) if diff_flag else '') +
+                    '_' + mwp.getlatlimstring(latLim, '') +
+                    '_' + mwp.getlonlimstring(lonLim, '') +
+                    '_mon{:02d}-{:02d}'.format(tLim[0], tLim[-1]-1)
+                    )
+
+        # Set saved figure size (inches)
+        fx = hf.get_size_inches()[0]
+        fy = hf.get_size_inches()[1]
+
+        # Save figure
+        if any([saveSubDir is None,
+                saveSubDir == '']):
+            tempSub = saveSubDir
+            saveSubDir = 'atm/meridslices/'
+        print(saveDir + saveSubDir + saveFile)
+        mwp.savefig(saveDir + saveSubDir + saveFile,
+                    shape=np.array([fx, fy]))
+        saveSubDir = tempSub
+        plt.close('all')
+
+    return ax, cset1, q1
+
+
+def plotmultipressurelat(dsDict,
+                         plotIdList,
+                         colorVar,
+                         cbar_flag=True,
+                         cbarOrientation='vertical',
+                         diff_flag=False,
+                         diffIdList=None,
+                         dt=1,
+                         figSize=None,
+                         fontSize=12,
+                         latLim=np.array([-30, 30]),
+                         lonLim=np.array([240, 270]),
+                         obsDs=None,
+                         plev=None,
+                         quiver_flag=False,
+                         quiverScale=0.4,
+                         quiverUnits='inches',
+                         rmse_flag=False,
+                         # rmRegMean_flag=False,
+                         save_flag=False,
+                         saveDir=None,
+                         stampDate_flag=False,
+                         saveSubDir=None,
+                         saveThenClose_flag=True,
+                         subFigCountStart='a',
+                         tLim=None,
+                         verbose_flag=False,
+                         wScale=100,
+                         **kwargs
+                         ):
+    """
+    Plot meridional cross-sections from multiple cases for comparison
+
+    Version Date:
+        2018-06-14
+    """
+
+    # Ensure diffIdList or diffDs provided if diff_flag
+    if all([diff_flag, (diffIdList is None)]):
+        raise ValueError('diffIdList must be provided to plot ' +
+                         'differences')
+
+    # Determine time step parameters
+    if tLim is None:
+        tLim = np.array([0, dsDict[plotIdList[0]][colorVar].shape[0]])
+
+    # Create figure for plotting
+    hf = plt.figure()
+
+    # Set figure window title
+    hf.canvas.set_window_title(('d' if diff_flag else '') +
+                               'complatP: ' + colorVar
+                               )
+
+    # Set gridspec values for subplots
+    if len(plotIdList) == 2:
+        if cbarOrientation == 'vertical':
+            # Set figure window size
+            hf.set_size_inches(9, 2, forward=True)
+
+            # Set up subplots
+            gs = gridspec.GridSpec(1, 3,
+                                   # height_ratios=[20, 1, 20, 1, 20],
+                                   # hspace=0.3,
+                                   width_ratios=[30, 30, 1],
+                                   )
+            gs.update(left=0.07, right=0.95, top=0.95, bottom=0.05)
+
+            # Set gridspec colorbar location
+            cbColInd = 2
+            cbRowInd = 0
+            cbar_xoffset = -0.04
+
+        elif cbarOrientation == 'horizontal':
+            # Set figure window size
+            hf.set_size_inches(7.5, 4, forward=True)
+
+            # Set up subplots
+            gs = gridspec.GridSpec(2, 2,
+                                   height_ratios=[20, 1],
+                                   )
+
+            # Set gridspec colorbar location
+            cbColInd = 0
+            cbRowInd = 1
+
+        # Set gridpsec index order
+        colInds = [0, 1]
+        rowInds = [0, 0]
+    if len(plotIdList) == 3:
+        if cbarOrientation == 'vertical':
+            # Set figure window size
+            hf.set_size_inches(9, 8, forward=True)
+
+            # Set up subplots
+            gs = gridspec.GridSpec(3, 2,
+                                   # height_ratios=[20, 1, 20, 1, 20],
+                                   hspace=0.3,
+                                   width_ratios=[30, 1],
+                                   )
+            gs.update(left=0.07, right=0.95, top=0.95, bottom=0.05)
+
+            # Set gridspec colorbar location
+            cbColInd = 1
+            cbRowInd = 0
+            cbar_xoffset = -0.04
+
+        elif cbarOrientation == 'horizontal':
+            # Set figure window size
+            hf.set_size_inches(7.5, 10, forward=True)
+
+            # Set up subplots
+            gs = gridspec.GridSpec(6, 1,
+                                   height_ratios=[20, 1, 20, 1, 20, 1],
+                                   )
+
+            # Set gridspec colorbar location
+            cbColInd = 0
+            cbRowInd = 5
+
+        # Set gridpsec index order
+        colInds = [0, 0, 0]
+        rowInds = [0, 1, 2]
+
+    elif len(plotIdList) == 4:
+        if cbarOrientation == 'vertical':
+            # Set figure window size
+            if figSize is None:
+                hf.set_size_inches(9, 3, forward=True)
+            else:
+                hf.set_size_inches(figSize[0], figSize[1],
+                                   forward=True)
+
+            # Set up subplots
+            gs = gridspec.GridSpec(2, 3,
+                                   # height_ratios=[20, 1, 20, 1, 20],
+                                   hspace=0.1,
+                                   width_ratios=[30, 30, 1],
+                                   )
+            gs.update(left=0.05, right=0.92, top=0.95, bottom=0.05)
+
+            # Set gridpsec index order
+            colInds = [0, 1, 0, 1]
+            rowInds = [0, 0, 1, 1]
+            cbar_xoffset = -0.04
+
+            # Set gridspec colorbar location
+            cbColInd = 2
+            cbRowInd = 0
+
+    elif len(plotIdList) == 6:
+        if cbarOrientation == 'vertical':
+            # Set figure window size
+            hf.set_size_inches(13, 6,
+                               forward=True)
+
+            # Set up subplots
+            gs = gridspec.GridSpec(2, 4,
+                                   # height_ratios=[20, 1, 20, 1, 20],
+                                   # hspace=0.3,
+                                   width_ratios=[30, 30, 30, 1],
+                                   wspace=0.35,
+                                   )
+            gs.update(left=0.1, right=0.92, top=0.95, bottom=0.1)
+
+            # Set gridpsec index order
+            colInds = [0, 1, 2, 0, 1, 2]
+            rowInds = [0, 0, 0, 1, 1, 1]
+
+            # Set gridspec colorbar location
+            cbColInd = 3
+            cbRowInd = 0
+            cbar_xoffset = -0.03
+        else:
+            raise NotImplementedError('Horizontal. colorbar not supported ' +
+                                      'for 6 panel plot')
+
+    elif len(plotIdList) == 9:
+        if cbarOrientation == 'vertical':
+            # Set figure window size
+            if np.diff(latLim) >= 50:
+                hf.set_size_inches(16.25, 6.75, forward=True)
+            else:
+                hf.set_size_inches(16.25, 5.75, forward=True)
+
+            # Set up subplots
+            gs = gridspec.GridSpec(3, 4,
+                                   height_ratios=[1, 1, 1],
+                                   hspace=0.00,
+                                   width_ratios=[30, 30, 30, 1],
+                                   wspace=0.2,
+                                   left=0.04,
+                                   right=0.96,
+                                   bottom=0.00,
+                                   top=1.0,
+                                   )
+
+            # Set gridspec colorbar location
+            cbColInd = 3
+            cbRowInd = 0
+            cbar_xoffset = -0.01
+
+        elif cbarOrientation == 'horizontal':
+            # Set figure window size
+            hf.set_size_inches(14, 12, forward=True)
+
+            # Set up subplots
+            gs = gridspec.GridSpec(4, 3,
+                                   height_ratios=[20, 20, 20, 1],
+                                   hspace=0.5,
+                                   width_ratios=[1, 1, 1],
+                                   wspace=0.5,
+                                   )
+
+            # Set gridspec colorbar location
+            cbColInd = 0
+            cbRowInd = 3
+
+        # Set gridspec index order
+        colInds = [0, 1, 2, 0, 1, 2, 0, 1, 2]
+        rowInds = [0, 0, 0, 1, 1, 1, 2, 2, 2]
+
+    # Plot maps
+    skippedPlotCount = 0
+    for jSet, plotId in enumerate(plotIdList):
+
+        if plotId is None:
+            skippedPlotCount = skippedPlotCount + 1
+            print('skipping {:d}'.format(jSet))
+            continue
+
+        plt.subplot(gs[rowInds[jSet], colInds[jSet]])
+
+        if diff_flag:
+            diffId = diffIdList[jSet]
+            if verbose_flag:
+                print(plotId + ' - ' + diffId)
+        else:
+            if verbose_flag:
+                print(plotId)
+        if plotId != 'obs':
+            ax, im1, q1 = plotpressurelat(
+                dsDict[plotId],
+                colorVar,
+                cbar_flag=False,
+                # colorConts=None,
+                # dCont_flag=False,
+                # dContCase=None,
+                diff_flag=diff_flag,
+                diffDs=(dsDict[diffId] if diff_flag else None),
+                dt=dt,
+                latLim=latLim,
+                lonLim=lonLim,
+                # lineCont_flag=lineCont_flag,
+                # lineContDiff_flag=lineContDiff_flag,
+                # lineConts=None,
+                # lineContVar=colorVar,
+                # lineContDs=dataSets_rg[(plotCase
+                #                        if lineContDiff_flag
+                #                        else diffCase)],
+                # lineContDiffDs=dataSets_rg[diffCase],
+                makeFigure_flag=False,
+                # pLim=pLim,
+                quiver_flag=quiver_flag,
+                quiverKey_flag=0,
+                # quiverScale=3,
+                # quiverUnits='inches',
+                save_flag=False,
+                tLim=tLim,
+                tLimLabel_flag=(jSet == 0),
+                wScale=wScale,
+                **kwargs
+                )
+        else:
+            raise NotImplementedError('Cannot plot obs yet')
+
+        if colInds[jSet] != 0:
+            plt.ylabel('')
+        if rowInds[jSet] != np.max(rowInds):
+            plt.xlabel('')
+
+        # Add subplot label (subfigure number)
+        ax.annotate('(' + chr(jSet +
+                              ord(subFigCountStart) -
+                              skippedPlotCount
+                              ) +
+                    ')',
+                    # xy=(-0.12, 1.09),
+                    xy=(-0.2, 1.03),
+                    xycoords='axes fraction',
+                    horizontalalignment='left',
+                    verticalalignment='bottom',
+                    fontweight='bold',
+                    )
+
+        # Get id for a good plot for colorbar making
+        if plotId != 'obs':
+            goodPlotId = plotId
+
+    # Add common colorbar
+
+    # Create axis for colorbar
+    cbar_ax = plt.subplot(gs[cbRowInd:, cbColInd:])
+
+    # Create colorbar and set position
+    hcb = plt.colorbar(im1,
+                       cax=cbar_ax,
+                       # format='%0.0f',
+                       orientation=cbarOrientation,
+                       )
+    pcb = cbar_ax.get_position()
+
+    # Get variable name for colorbar
+    varName = mwp.getplotvarstring(dsDict[goodPlotId][colorVar].name)
+
+    # Create colorbar
+    if cbarOrientation == 'vertical':
+        # Place colorbar on figure
+        cbar_ax.set_position([pcb.x0 + cbar_xoffset,
+                              pcb.y0 + pcb.height/6.,
+                              0.015, pcb.height*2./3.])
+
+        # Label colorbar with variable name and units
+        cbar_ax.set_ylabel(
+            (r'$\Delta$' if diff_flag else '') +
+            varName + ' (' +
+            mwfn.getstandardunitstring(
+                dsDict[goodPlotId][colorVar].units) +
+            ')')
+
+    elif cbarOrientation == 'horizontal':
+        # Place colorbar on figure
+        cbar_ax.set_position([pcb.x0, pcb.y0 - 0.015,
+                              pcb.width*1., 0.015])
+
+        # Label colorbar with variable name and units
+        cbar_ax.set_xlabel(
+            (r'$\Delta$' if diff_flag else '') +
+            varName + ' (' +
+            mwfn.getstandardunitstring(
+                dsDict[goodPlotId][colorVar].units) +
+            ')')
+
+    # Add colorbar ticks and ensure 0 is labeled if differencing
+    if diff_flag:
+        try:
+            hcb.set_ticks(im1.levels[::2]
+                          if np.min(np.abs(im1.levels[::2] - 0)
+                                    ) < 1e-10
+                          else im1.levels[1::2])
+        except TypeError:
+            pass
+
+    # Prevent colorbar from using offset (i.e. sci notation)
+    # hcb.ax.yaxis.get_major_formatter().set_useOffset(False)
+
+    # Add quiver key
+    if quiver_flag:
+        plt.quiverkey(q1,
+                      pcb.x0 + 0.01,
+                      pcb.y0 + pcb.height/6 - 0.05,
+                      1,
+                      '[v ({:d} {:s}), \n'.format(
+                          1,
+                          mwfn.getstandardunitstring('m/s')) +
+                      'w ({:0.0e} {:s})]'.format(
+                          1/wScale,
+                          mwfn.getstandardunitstring('m/s')),
+                      coordinates='figure',
+                      labelpos='S')
+
+    # Expand plot(s) to fill figure window
+    # gs.tight_layout(hf)
+
+    # Save figure if requested
+    if save_flag:
+
+        # Set directory for saving
+        if saveDir is None:
+            saveDir = os.path.dirname(os.path.realpath(__file__))
+
+        # Set string of latitude limits
+        lonLimString = ''.join(['{:02.0f}'.format(np.abs(lonLim[x])) +
+                                ('W' if (lonLim[x] < 0) else
+                                 ('E' if (lonLim[x] > 0) else ''))
+                                for x in range(lonLim.size)])
+
+        # Set file name for saving
+        tString = 'mon'
+        if diff_flag:
+            if all([diffIdList[j] == diffIdList[0]
+                    for j in range(len(diffIdList))]):
+                diffStr = 'd' + diffIdList[0] + '_'
+            else:
+                diffStr = ''
+            # Get variable name for saving
+            saveFile = ('d{:s}_'.format(colorVar) +
+                        ('VW_' if quiver_flag else '') +
+                        'latP_comp{:d}_'.format(len(plotIdList)) +
+                        diffStr +
+                        '{:s}_'.format(lonLimString) +
+                        tString +
+                        '{:02.0f}'.format(tLim[0]) + '-' +
+                        '{:02.0f}'.format(tLim[-1]-1)
+                        )
+        else:
+            if len(plotIdList) > 3:
+                caseSaveString = 'comp{:d}'.format(len(plotIdList))
+            else:
+                caseSaveString = '_'.join(plotIdList)
+            saveFile = (
+                '{:s}_'.format(colorVar) +
+                ('VW_' if quiver_flag else '') +
+                'latP_' +
+                caseSaveString + '_' +
+                '{:s}_'.format(lonLimString) +
+                tString +
+                '{:02.0f}'.format(tLim[0]) + '-' +
+                '{:02.0f}'.format(tLim[-1]-1) +
+                ('_nocb' if not cbar_flag else '')
+                )
+
+        # Set saved figure size (inches)
+        fx = hf.get_size_inches()[0]
+        fy = hf.get_size_inches()[1]
+
+        # Save figure
+        print(saveDir + saveSubDir + saveFile)
+        # mwp.savefig(saveDir + saveSubDir + saveFile,
+        #             shape=np.array([fx, fy]))
+        if saveThenClose_flag:
+            plt.close('all')
 
 # %%Do other stuff

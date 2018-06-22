@@ -17,9 +17,6 @@ import xarray as xr  # for handling nd things (netcdfs)
 import matplotlib.pyplot as plt  # for plotting things
 import matplotlib.gridspec as gridspec  # for subplot management
 
-from socket import gethostname   # used to determine which machine we are
-#                                #   running on
-
 import multiprocessing as mp  # Allow use of multiple cores
 import datetime  # For keeping track of run times
 
@@ -33,55 +30,6 @@ import os  # operating system things.
 # from scipy.stats import linregress
 
 # %% Define funcitons as needed
-
-
-def setfilepaths(newRuns_flag=False):
-    """
-    Set host specific variables and filepaths
-
-    Author:
-        Matthew Woelfle (mdwoelfle@gmail.com)
-
-    Version Date:
-        2018-05-23
-
-    Args:
-        N/A
-
-    Kwargs:
-        newRuns_flag - True to change directorys for new runs
-            (on yslogin only!)
-
-    Returns:
-        ncDir - directory in which netcdf case directories are stored
-        ncSubDir - directory within case directory to search for netcdfs
-        saveDir - directory to which figures will be saved
-
-    Notes:
-        fullPathForHistoryFileDirectory = (ncDir + fullCaseName +
-                                           os.sep + ncSubDir)
-    """
-
-    if gethostname() in ['stable', 'challenger', 'p', 'fog']:
-        ncDir = '/home/disk/eos9/woelfle/cesm/nobackup/cesm1to2/'
-        ncSubDir = '0.9x1.25/'
-        saveDir = ('/home/disk/user_www/woelfle/cesm1to2/')
-
-    elif gethostname() == 'woelfle-laptop':
-        ncDir = 'C:\\Users\\woelfle\\Documents\\UW\\CESM\\hist\\'
-        ncSubDir = ''
-        saveDir = 'C:\\Users\\woelfle\\Documents\\UW\\CESM\\figs\\'
-
-    elif gethostname()[0:6] in ['yslogi', 'geyser', 'cheyen']:
-        if newRuns_flag:
-            ncDir = '/glade/scratch/woelfle/archive/'
-            ncSubDir = 'atm/hist/'
-        else:
-            ncDir = '/glade/p/cgd/amp/people/hannay/amwg/climo/'
-            ncSubDir = '0.9x1.25/'
-        saveDir = '/glade/work/woelfle/figs/cesm1to2/'
-
-    return (ncDir, ncSubDir, saveDir)
 
 
 def getcolordict():
@@ -154,8 +102,8 @@ if __name__ == '__main__':
     regrid2file_flag = True
     regridOverwrite_flag = False
     reload_flag = False
-    save_flag = True
-    saveDir = setfilepaths()[2]
+    save_flag = False
+    saveDir = c1to2p.setfilepaths()[2]
     saveSubDir = ''  # 'testfigs/66to125/'
     saveThenClose_flag = True
     verbose_flag = False
@@ -169,7 +117,7 @@ if __name__ == '__main__':
     plotLonVCentroid_flag = False
     plotObsMap_flag = False
     plotOneMap_flag = False
-    plotMultiMap_flag = True
+    plotMultiMap_flag = False
     plotMultiPressureLat_flag = True
     plotGpcpTest_flag = False
     plotPressureLat_flag = False
@@ -179,14 +127,6 @@ if __name__ == '__main__':
     plotZonRegMeanHov_flag = False
     plotZonRegMeanLines_flag = False
     testPlotErai_flag = False
-
-    # Set new variables to compute when loading
-    newVars = 'PRECT'
-
-    # Get directory of file to load
-    ncDir, ncSubDir, saveDir2 = setfilepaths(newRuns_flag)
-    if saveDir is None:
-        saveDir = saveDir2
 
     # Set name(s) of file(s) to load
     versionIds = [  # '01',
@@ -209,352 +149,81 @@ if __name__ == '__main__':
                   # '194',
                   # '195'
                   ]
-    climoCases = ['01', '28', '36', 'ga7.66', '100', '113', '114', '116',
-                  '118', '119', '119f', '119f_gamma',
-                  '125', '125f', '161', '194', '195'
+
+    # Set levels for vertically regridding
+    newLevs = np.array([100, 200, 275, 350, 425,
+                        500, 550, 600, 650, 700,
+                        750, 800, 850, 900, 950,
+                        975, 1000])
+
+    # Set variables to regrid vertically
+    regridVars = ['V', 'OMEGA', 'RELHUM', 'CLOUD', 'T', 'U',
+                  'AREI', 'AREL', 'AWNC', 'AWNI',
+                  'CLDICE', 'CLDLIQ',
+                  'ICIMR', 'ICWMR',
                   ]
-    fileBaseDict = c1to2p.getcasebase()
-    # if newRuns_flag:
-    #     loadSuffixes = ['.cam.h0.' + '{:04d}'.format(yr + 1) +
-    #                     '-{:02d}'.format(mon+1) + '.nc'
-    #                     for mon in range(12)
-    #                     for yr in range(10)]
-    # else:
-    loadSuffixes = {
-        versionIds[j]: (['_' + '{:02d}'.format(mon + 1) + '_climo.nc'
-                         for mon in range(12)]
-                        if versionIds[j] in climoCases
-                        else ['.cam.h0.' + '{:04d}'.format(yr + 2) +
-                              '-{:02d}'.format(mon+1) + '.nc'
-                              for mon in range(12)
-                              for yr in range(1)])
-        for j in range(len(versionIds))
-        }
 
-    # Create list of files to load
-    if newRuns_flag:
-        loadFileLists = {versionIds[j]: [ncDir + fileBaseDict[versionIds[j]] +
-                                         '/' +
-                                         ncSubDir +
-                                         fileBaseDict[versionIds[j]] +
-                                         loadSuffix
-                                         for loadSuffix in loadSuffixes]
-                         for j in range(len(versionIds))}
-    else:
-        loadFileLists = {vid: [ncDir + fileBaseDict[vid] +
-                               '/' +
-                               ('atm/hist/'
-                                if 'f' in vid
-                                else ncSubDir) +
-                               fileBaseDict[vid] +
-                               loadSuffix
-                               for loadSuffix in loadSuffixes[vid]]
-                         for vid in versionIds}
-
-    # Open netcdf file(s)
+    # Determine if need to load new datasets
     try:
         if not all([vid in dataSets.keys() for vid in versionIds]):
             load_flag = True
         else:
-            load_flag = False
+            if regridVertical_flag:
+                # Ensure that vertical regrid dataset exists
+                try:
+                    # Esnure all requested regridded variables are present
+                    if not all([regridVar in dataSets_rg[versionIds[0]]
+                                for regridVar in regridVars]):
+                        load_flag = True
+                    else:
+                        load_flag = False
+                except NameError:
+                    load_flag = True
+            else:
+                load_flag = False
     except NameError:
         load_flag = True
 
+    # Get directory of file to load
+    ncDir, ncSubDir, saveDir2 = c1to2p.setfilepaths(newRuns_flag)
+    if saveDir is None:
+        saveDir = saveDir2
+
+    # Load (or reload) datasets from file and regrid if requested/needed
     if load_flag or reload_flag:
-        dataSets = {versionId: xr.open_mfdataset(loadFileLists[versionId],
-                                                 decode_times=False)
-                    for versionId in versionIds}
+        dataSets, dataSets_rg = c1to2p.loadmodelruns(
+            versionIds,
+            mp_flag=mp_flag,
+            ncDir=ncDir,
+            ncSubDir=ncSubDir,
+            newLevs=newLevs,
+            regrid2file_flag=regrid2file_flag,
+            regridOverwrite_flag=regridOverwrite_flag,
+            regridVars=regridVars,
+            regridVertical_flag=regridVertical_flag,
+            )
 
-    # Compute extra variable fields as requested
-    for vid in versionIds:
-        if verbose_flag:
-            print(vid)
+    # Load observational datasets to be used for comparison
+    obsDsDict = c1to2p.loadobsdatasets(
+        obsList=None,
+        gpcp_flag=(loadGpcp_flag or plotGpcpTest_flag),
+        erai_flag=loadErai_flag,
+        hadIsst_flag=loadHadIsst_flag,
+        hadIsstYrs=[1979, 2010],
+        )
 
-        # Compute PRECT
-        if prect_flag:
-            dataSets[vid]['PRECT'] = mwfn.calcprectda(dataSets[vid])
+    # Compatability code for quickness. May update later.
+    if loadGpcp_flag or plotGpcpTest_flag:
+        gpcpDs = obsDsDict['gpcp']
+        # Load GPCP from both climo and add id
+        gpcpClimoDs = obsDsDict['gpcpClimo']
 
-        # Compute FNS
-        if fns_flag:
-            dataSets[vid]['FNS'] = mwfn.calcfnsda(dataSets[vid])
+    if loadHadIsst_flag:
+        hadIsstDs = obsDsDict['hadIsst']
 
-        # Compute FNT
-        if fnt_flag:
-            dataSets[vid]['FNT'] = mwfn.calcfntda(dataSets[vid])
-
-    # Add version id to dataSets for easy access and bookkeeping
-    for vid in versionIds:
-        dataSets[vid].attrs['id'] = vid
-
-    if any([obs_flag, plotGpcpTest_flag,
-            loadGpcp_flag, loadHadIsst_flag,
-            loadErai_flag]):
-
-        if loadGpcp_flag or plotGpcpTest_flag:
-            # # Load GPCP
-
-            # Set directories for GPCP
-            gpcpDir = '/home/disk/eos9/woelfle/dataset/GPCP/climo/'
-            gpcpFile = 'gpcp_197901-201012.nc'
-            gpcpClimoFile = 'gpcp_197901-201012_climo.nc'
-
-            # Load GPCP for all years and add id
-            # if plotGpcpTest_flag:
-            gpcpDs = xr.open_dataset(gpcpDir + gpcpFile)
-            gpcpDs.attrs['id'] = 'GPCP_all'
-
-            # Load GPCP from both climo and add id
-            gpcpClimoDs = xr.open_dataset(gpcpDir + gpcpClimoFile)
-            gpcpClimoDs.attrs['id'] = 'GPCP'
-
-        if loadHadIsst_flag:
-            hadIsstYrs = [1979, 2010]
-            # Attempt to look at other averaging periods for HadISST
-            hadIsstDs = mwfn.loadhadisst(climoType='monthly',
-                                         daNewGrid=None,
-                                         kind='linear',
-                                         newGridFile=None,
-                                         newGridName='0.9x1.25',
-                                         newLat=None,
-                                         newLon=None,
-                                         qc_flag=False,
-                                         regrid_flag=True,
-                                         whichHad='all',  # 'pd_monclimo'
-                                         years=hadIsstYrs,
-                                         )
-
-        if loadErai_flag:
-            eraiDs = mwfn.loaderai(daNewGrid=None,
-                                   kind='linear',
-                                   loadClimo_flag=True,
-                                   newGridFile=None,
-                                   newGridName='0.9x1.25',
-                                   newLat=None,
-                                   newLon=None,
-                                   regrid_flag=False,
-                                   whichErai='monmean',
-                                   )
-            erai3dDs = mwfn.loaderai(daNewGrid=None,
-                                     kind='linear',
-                                     loadClimo_flag=True,
-                                     newGridFile=None,
-                                     newGridName='0.9x1.25',
-                                     newLat=None,
-                                     newLon=None,
-                                     regrid_flag=False,
-                                     whichErai='monmean.3d',
-                                     )
-
-    # Set variable of interest
-    plotVars = ['TS']  # , 'TS', 'TAUX']
-
-    print('--Loading done--')
-    # Conver things to reasonable units if needed
-#    newUnits = {'PRECC': 'mm/d',
-#                'PRECL': 'mm/d'}
-#    if plotVar in newUnits.keys():
-#        for vid in versionIds:
-#            (dataSets[vid][plotVar].values,
-#             dataSets[vid][plotVar].attrs['units']) = \
-#                mwfn.convertunit(dataSets[vid][plotVar].values,
-#                                 dataSets[vid][plotVar].units,
-#                                 newUnits[plotVar]
-#                                 )
-
-# %% Regrid 3D fields
-
-    # Regridding with multiprocessing
-    if all([regridVertical_flag,
-            any([reload_flag, load_flag])]):
-
-        print('>> Regridding vertical levels <<')
-
-        # Set new levels for regridding
-        #   > Timing works out to about 30s per level per case (seems long...)
-        # 200, 300, 400, 500, 600, 675, 750, 800, 850, 900, 950, 1000]),
-        newLevs = np.array([100, 200, 275, 350, 425,
-                            500, 550, 600, 650, 700,
-                            750, 800, 850, 900, 950,
-                            975, 1000])
-        regridVars = ['V', 'OMEGA', 'RELHUM', 'CLOUD', 'T', 'U',
-                      'AREI', 'AREL', 'AWNC', 'AWNI',
-                      'CLDICE', 'CLDLIQ',
-                      'ICIMR', 'ICWMR',
-                      ]
-
-        # Set flag to tell if need to redo regridding
-        need2regrid_flag = False
-        regridIds = []
-
-        # First attempt to load each case from file
-        #   add cases to list to be regridded as they fail certain checks
-        dataSets_rg = dict()
-        for versionId in versionIds:
-            # Attempt to load previously regridded case from file
-            try:
-                ncFile = (ncDir +
-                          fileBaseDict[versionId] + '/' +
-                          ('atm/hist/'
-                           if 'f' in versionId
-                           else ncSubDir) +
-                          '3dregrid/' +
-                          fileBaseDict[versionId] +
-                          '.plevs.nc')
-                dataSets_rg[versionId] = xr.open_dataset(ncFile)
-            except OSError:
-                regridIds.append(versionId)
-                print('Previously regridding file unavaialble. ' +
-                      'Will regrid {:s}'.format(versionId))
-                continue
-
-            # Ensure all requested variables are present
-            if not all([x in dataSets_rg[versionId].data_vars
-                        for x in regridVars]):
-                regridIds.append(versionId)
-                print('Requested variables not all present. ' +
-                      'Will regrid {:s}'.format(versionId))
-                continue
-
-            # Check if all requested levels are present
-            if not all([x in dataSets_rg[versionId]['plev'].values
-                        for x in newLevs]):
-                regridIds.append(versionId)
-                print('Not all levels present. ' +
-                      'Will regrid {:s}'.format(versionId))
-                continue
-
-        # Perform regridding if cannot load appropriate regridded cases from
-        #   previously regridded files
-        if regridIds:
-            # Start timing clock
-            regridStartTime = datetime.datetime.now()
-            print(regridStartTime.strftime('--> Regrid start time: %X'))
-
-            # Regrid using multiprocessing
-            if mp_flag:
-                # Regrid 3D variables using multiprocessing
-                #   Parallelizing over cases(?)
-                #   Need to be wary here to not run out of memory.
-                mpPool = mp.Pool(1)
-
-                # Load all datasets to memory to enable multiprocessing
-                for vid in regridIds:
-                    print(vid)
-                    for regridVar in regridVars:
-                        dataSets[vid][regridVar].load()
-                    dataSets[vid]['PS'].load()
-                    dataSets[vid]['hyam'].load()
-                    dataSets[vid]['hybm'].load()
-                    dataSets[vid]['P0'].load()
-
-                # Create input tuple for regridding to pressure levels
-                mpInList = [(dataSets[vid],
-                             regridVars,
-                             newLevs,
-                             {'hCoeffs': {
-                                 'hyam': dataSets[vid]['hyam'].mean(
-                                     dim='time').values,
-                                 'hybm': dataSets[vid]['hybm'].mean(
-                                     dim='time').values,
-                                 'P0': dataSets[vid]['P0'].values[0]},
-                              'modelid': 'cesm',
-                              'psVar': 'PS',
-                              'verbose_flag': False}
-                             )
-                            for vid in regridIds]
-
-                # Call multiprocessing of regridding
-                # regriddedVars = mpPool.map(mwfn.regriddssigmatopres_mp,
-                #                            mpInList)
-                # regriddedVars = mpPool.map_async(mwfn.regriddssigmatopres_mp,
-                #                                 mpInList)
-                dsOut = mpPool.map_async(mwfn.convertsigmatopresds_mp,
-                                         mpInList)
-                # dsOut = mpPool.map(mwfn.convertsigmatopresds_mp,
-                #                   mpInList)
-
-                # Close multiprocessing pool
-                dsOut = dsOut.get()
-                mpPool.close()
-                mpPool.terminate()  # Not proper,
-                #                   #    but may be needed to work properly
-                mpPool.join()
-
-                # Convert dsOut from list of datasets to dictionary of datasets
-                dataSets_rg = {dsOut[j].id: dsOut[j]
-                               for j in range(len(dsOut))}
-            else:
-                # Regrid without multiprocessing
-                #   Some cases error out with mp for unknown reasons
-                for vid in regridIds:
-                    dataSets_rg[vid] = mwfn.convertsigmatopresds(
-                        dataSets[vid],
-                        regridVars,
-                        newLevs,
-                        hCoeffs={'hyam': dataSets[vid]['hyam'].mean(
-                                     dim='time').values,
-                                 'hybm': dataSets[vid]['hybm'].mean(
-                                     dim='time').values,
-                                 'P0': dataSets[vid]['P0'].values[0]
-                                 },
-                        modelid='cesm',
-                        psVar='PS',
-                        verbose_flag=False,
-                        )
-
-            # Write time elapsed at end of regridding
-            print('\n##------------------------------##')
-            print('Time to regrid with mp:')
-            print(datetime.datetime.now() - regridStartTime)
-            print('##------------------------------##\n')
-
-            # Write regridded datasets to file for quick future reloading.
-            if regrid2file_flag:
-                for versionId in regridIds:
-
-                    # Set directory for saving netcdf file of regridded output
-                    threeDdir = (ncDir + fileBaseDict[versionId] + '/' +
-                                 ('atm/hist/'
-                                  if 'f' in versionId
-                                  else ncSubDir) +
-                                 '3dregrid/')
-                    # Set filename for saving netcdf file of regridded output
-                    threeDfile = (fileBaseDict[versionId] +
-                                  '.plevs.nc')
-
-                    # Create directory if needed
-                    if not os.path.exists(threeDdir):
-                        os.makedirs(threeDdir)
-
-                    # Save netcdf file if possible
-                    try:
-                        if os.path.exists(threeDdir + threeDfile):
-                            try:
-                                print('Writing {:s}'.format(
-                                      threeDdir + threeDfile))
-                                dataSets_rg[versionId].to_netcdf(
-                                    path=threeDdir + threeDfile,
-                                    mode='w')
-                            except OSError as ose:
-                                if regridOverwrite_flag:
-                                    print('Overwriting existing file at:\n' +
-                                          threeDdir + threeDfile)
-                                    os.remove(threeDdir + threeDfile)
-                                    dataSets_rg[versionId].to_netcdf(
-                                        path=threeDdir + threeDfile,
-                                        mode='w')
-                                else:
-                                    raise OSError(
-                                        'File already exists:\n' +
-                                        threeDdir + threeDfile)
-                            except RuntimeError:
-                                continue
-                        else:
-                            dataSets_rg[versionId].to_netcdf(
-                                path=threeDdir + threeDfile,
-                                mode='w')
-                    except ValueError:
-                        raise ValueError('probably related to datetime.')
+    if loadErai_flag:
+        eraiDs = obsDsDict['erai']
+        erai3dDs = obsDsDict['erai3d']
 
 # %% Plot one map
 
@@ -669,7 +338,7 @@ if __name__ == '__main__':
                 if save_flag:
                     # Set directory for saving
                     if saveDir is None:
-                        saveDir = setfilepaths()[2]
+                        saveDir = c1to2p.setfilepaths()[2]
 
                     # Set file name for saving
                     tString = 'mon'
@@ -765,7 +434,7 @@ if __name__ == '__main__':
                 quiverScaleVar=None,
                 rmRegMean_flag=False,
                 save_flag=save_flag,
-                saveDir=(setfilepaths()[2] + saveSubDir +
+                saveDir=(c1to2p.setfilepaths()[2] + saveSubDir +
                          'obs_'),
                 stampDate_flag=False,
                 tSteps=tSteps,
@@ -814,89 +483,91 @@ if __name__ == '__main__':
 # %% Plot multiple maps
     if plotMultiMap_flag:
         # save_flag = True
-        plotVars = ['FLUT', 'PRECT', 'CLDLOW', 'CLDHGH', 'CLDTOT']
+        plotVars = ['PRECT']  # , 'T', 'RELHUM', 'CLOUD']
         #        'CDNUMC']  # , 'SWCF', 'PBLH']
-        plev = 900
-        box_flag = True
+        plevs = [850, 500, 200]
+        box_flag = False
         boxLat = np.array([-30, 30])
         boxLon = np.array([240, 270])
-        diff_flag = True
+        diff_flag = False
         diffDs = None  # dataSets_rg
         diffIdList = ['119', '119f', None,
                       '119f', '119f', '119f']
         diffVar = None
-        diffPlev = plev
-        plotIdList = ['125', '125f', None,
+        diffPlevs = plevs
+        plotIdList = ['125', '125f', (None if diff_flag else '119f'),
                       '119f_microp', '119f_gamma', '119f_liqss']
         #        '01', '28', '36',
         #              'ga7.66', '119', '125',
         #              '161', '194', '195']
         quiver_flag = False
-        uVar = 'TAUX'
-        vVar = 'TAUY'
+        uVar = 'U'
+        vVar = 'V'
         levels = None  # np.arange(-0.25, 0.251, 0.025)
 
-        tSteps = np.arange(1, 5)
+        tSteps = np.arange(0, 12)
 
         for plotVar in plotVars:
-            if diffVar is None:
-                diffVar = plotVar
-            c1to2p.plotmultilatlon((dataSets_rg
-                                    if plotVar in dataSets_rg[plotIdList[0]]
-                                    else dataSets),
-                                   plotIdList,
-                                   plotVar,
-                                   box_flag=box_flag,
-                                   boxLat=boxLat,
-                                   boxLon=boxLon,
-                                   cbar_flag=True,
-                                   cbarOrientation='vertical',
-                                   compcont_flag=False,
-                                   diff_flag=diff_flag,
-                                   diffIdList=diffIdList,
-                                   diffDs=diffDs,
-                                   diffPlev=diffPlev,
-                                   diffVar=diffVar,
-                                   figSize=[18, 6],
-                                   fontSize=24,
-                                   latLim=np.array([-30.1, 30.1]),
-                                   latlbls=np.arange(-30, 30.1, 10),
-                                   levels=levels,
-                                   lonLim=np.array([99.5, 290.5]),
-                                   lonlbls=np.arange(120, 270.1, 30),
-                                   obsDs=gpcpClimoDs,
-                                   ocnOnly_flag=False,
-                                   plev=plev,
-                                   quiver_flag=quiver_flag,
-                                   quiverNorm_flag=False,
-                                   quiverScale=(
-                                       getquiverprops(
-                                            uVar, vVar,
-                                            diff_flag=diff_flag)['quiverScale']
-                                       ),
-                                   quiverUnits='inches',
-                                   rmRegLatLim=np.array([-20, 20]),
-                                   rmRegLonLim=np.array([119.5, 270.5]),
-                                   rmRegMean_flag=False,
-                                   rmse_flag=False,
-                                   save_flag=save_flag,
-                                   saveDir=(saveDir +
-                                            saveSubDir +
-                                            'atm/maps/'
-                                            ),
-                                   stampDate_flag=False,
-                                   subFigCountStart='a',
-                                   subSamp=7,
-                                   tSteps=tSteps,
-                                   uRef=getquiverprops(
-                                       uVar, vVar,
-                                       diff_flag=diff_flag)['uRef'],
-                                   uVar=uVar,
-                                   vVar=vVar,
-                                   verbose_flag=False,
-                                   )
-            if diffVar == plotVar:
-                diffVar = None
+            for jlev, plev in enumerate(plevs):
+                if diffVar is None:
+                    diffVar = plotVar
+                c1to2p.plotmultilatlon((dataSets_rg
+                                        if plotVar
+                                        in dataSets_rg[plotIdList[0]]
+                                        else dataSets),
+                                       plotIdList,
+                                       plotVar,
+                                       box_flag=box_flag,
+                                       boxLat=boxLat,
+                                       boxLon=boxLon,
+                                       cbar_flag=True,
+                                       cbarOrientation='vertical',
+                                       compcont_flag=False,
+                                       diff_flag=diff_flag,
+                                       diffIdList=diffIdList,
+                                       diffDs=diffDs,
+                                       diffPlev=diffPlevs[jlev],
+                                       diffVar=diffVar,
+                                       figSize=[18, 6],
+                                       fontSize=24,
+                                       latLim=np.array([-30.1, 30.1]),
+                                       latlbls=np.arange(-30, 30.1, 10),
+                                       levels=levels,
+                                       lonLim=np.array([99.5, 290.5]),
+                                       lonlbls=np.arange(120, 270.1, 30),
+                                       obsDs=gpcpClimoDs,
+                                       ocnOnly_flag=False,
+                                       plev=plev,
+                                       quiver_flag=quiver_flag,
+                                       quiverNorm_flag=False,
+                                       quiverScale=(
+                                           getquiverprops(
+                                                uVar, vVar,
+                                                diff_flag=diff_flag)['quiverScale']
+                                           ),
+                                       quiverUnits='inches',
+                                       rmRegLatLim=np.array([-20, 20]),
+                                       rmRegLonLim=np.array([119.5, 270.5]),
+                                       rmRegMean_flag=False,
+                                       rmse_flag=False,
+                                       save_flag=save_flag,
+                                       saveDir=(saveDir +
+                                                saveSubDir +
+                                                'atm/maps/'
+                                                ),
+                                       stampDate_flag=False,
+                                       subFigCountStart='a',
+                                       subSamp=7,
+                                       tSteps=tSteps,
+                                       uRef=getquiverprops(
+                                           uVar, vVar,
+                                           diff_flag=diff_flag)['uRef'],
+                                       uVar=uVar,
+                                       vVar=vVar,
+                                       verbose_flag=False,
+                                       )
+                if diffVar == plotVar:
+                    diffVar = None
 
 # %% Plot regional means (biases)
 
@@ -1532,7 +1203,7 @@ if __name__ == '__main__':
         if save_flag:
             # Set directory for saving
             if saveDir is None:
-                saveDir = setfilepaths()[2]
+                saveDir = c1to2p.setfilepaths()[2]
 
             # Set file name for saving
             tString = 'mon'
@@ -1594,7 +1265,7 @@ if __name__ == '__main__':
             if save_flag:
                 # Set directory for saving
                 if saveDir is None:
-                    saveDir = setfilepaths()[2]
+                    saveDir = c1to2p.setfilepaths()[2]
 
                 # Set file name for saving
                 tString = 'mon'
@@ -1749,7 +1420,7 @@ if __name__ == '__main__':
         if save_flag:
             # Set directory for saving
             if saveDir is None:
-                saveDir = setfilepaths()[2]
+                saveDir = c1to2p.setfilepaths()[2]
 
             # Set file name for saving
             tString = 'mon'
@@ -1791,7 +1462,7 @@ if __name__ == '__main__':
                                    lonLim=lonLim,
                                    ocnOnly_flag=False,
                                    save_flag=save_flag,
-                                   saveDir=setfilepaths()[2] + saveSubDir,
+                                   saveDir=c1to2p.setfilepaths()[2] + saveSubDir,
                                    stdUnits_flag=True,
                                    subFigCountStart='a',
                                    )
@@ -1854,7 +1525,7 @@ if __name__ == '__main__':
                         )
 
             if save_flag:
-                mwp.savefig(setfilepaths()[2] +
+                mwp.savefig(c1to2p.setfilepaths()[2] +
                             saveSubDir + plotVar + '_zonmean_' +
                             mwp.getlatlimstring(latLim, '') + '_' +
                             mwp.getlonlimstring(lonLim, '') +
@@ -1891,7 +1562,7 @@ if __name__ == '__main__':
                                         plotObs_flag=True,
                                         plotLatLim=plotLatLim,
                                         save_flag=save_flag,
-                                        saveDir=setfilepaths()[2] + saveSubDir,
+                                        saveDir=c1to2p.setfilepaths()[2] + saveSubDir,
                                         stdUnits_flag=True,
                                         subFigCountStart='a',
                                         )
@@ -1971,10 +1642,11 @@ if __name__ == '__main__':
     if plotMultiPressureLat_flag:
         # save_flag = True
         # Set variable to plot with colored contours
-        colorVars = ['T', 'RELHUM', 'CLOUD', 'OMEGA']
+        colorVars = ['AREI']  # , 'AREL', 'CLDLIQ', 'CLDICE',
+        #             'T', 'RELHUM', 'CLOUD', 'OMEGA']
         plotCases = ['125', '125f', None,
                      '119f_microp', '119f_gamma', '119f_liqss']
-        diff_flag = True
+        diff_flag = False
         lineCont_flag = False
         lineContDiff_flag = False
 
@@ -1995,7 +1667,7 @@ if __name__ == '__main__':
         latLim = np.array([-40, 40])
         lonLim = np.array([240, 270])
         pLim = np.array([1000, 200])
-        tLim = np.array([1, 5])  # exclusive of end pt.
+        tLim = np.array([0, 12])  # exclusive of end pt.
         dt = 1
 
         # Loop through variables and plot them.
@@ -2235,8 +1907,8 @@ if __name__ == '__main__':
             if save_flag:
                 # Set directory for saving
                 if saveDir is None:
-                    saveDir = setfilepaths()[2] + saveSubDir
-                saveDir = setfilepaths()[2] + 'atm/meridslices/'
+                    saveDir = c1to2p.setfilepaths()[2] + saveSubDir
+                saveDir = c1to2p.setfilepaths()[2] + 'atm/meridslices/'
 
                 # Set filename for saving
                 saveFile = (('d' if diff_flag else '') +
@@ -2373,8 +2045,8 @@ if __name__ == '__main__':
         if save_flag:
             # Set directory for saving
             if saveDir is None:
-                saveDir = setfilepaths()[2] + saveSubDir
-            saveDir = setfilepaths()[2] + 'atm/meridslices/'
+                saveDir = c1to2p.setfilepaths()[2] + saveSubDir
+            saveDir = c1to2p.setfilepaths()[2] + 'atm/meridslices/'
 
             # Set filename for saving
             saveFile = (('d' if diff_flag else '') +

@@ -29,10 +29,13 @@ import calendar
 import mdwtools.mdwfunctions as mwfn  # import personal processing functions
 import mdwtools.mdwplots as mwp       # import personal plotting functions
 # import netCDF4 as nc4            # import netCDF4 as nc4
-import numpy as np               # import numpy as np
-# from socket import gethostname   # used to determine which machine we are
+import numpy as np               # for computational things
+import xarray as xr              # for handling netcdfs and datasets
+
+from socket import gethostname   # used to determine which machine we are
 #                                #   running on
-# from datetime import datetime    # for working with dates and stuff
+from datetime import datetime    # for getting dates and tracking run time
+import multiprocessing as mp     # Allow use of multiple cores
 # import time
 
 # Functions for plotlatloncontsovertime
@@ -357,7 +360,7 @@ def getmapcontlevels(plotVar,
         Matthew Woelfle
 
     Version Date:
-        2017-10-17
+        2018-06-20
 
     Args:
         plotVar - name of variable (in CESM parlance) for which contours are to
@@ -368,11 +371,11 @@ def getmapcontlevels(plotVar,
     """
     if diff_flag:
         try:
-            levels = {'CLDHGH': np.arange(-0.5, 0.51, 0.05),
+            levels = {'CLDHGH': np.arange(-0.2, 0.21, 0.02),
                       'CLDLOW': np.arange(-0.5, 0.51, 0.05),
                       'CLDMED': np.arange(-0.5, 0.51, 0.05),
                       'CLDTOT': np.arange(-0.5, 0.51, 0.05),
-                      'CLOUD': np.arange(-0.5, 0.51, 0.05),
+                      'CLOUD': np.arange(-0.25, 0.251, 0.025),
                       'FLNS': np.arange(-30., 30.1, 3),
                       'FLUT': np.arange(-15, 15.1, 1.5),
                       # 'FNS': np.arange(-600., 600.1, 100),
@@ -380,7 +383,8 @@ def getmapcontlevels(plotVar,
                       'FSNS': np.arange(-50, 50.1, 5.),
                       'LHFLX': np.arange(-50, 50.1, 5),
                       'LWCF': np.arange(-20, 20.1, 2),
-                      'OMEGA': np.arange(-0.12, 0.12001, 0.01),
+                      # 'OMEGA': np.arange(-0.12, 0.12001, 0.01),
+                      'OMEGA': np.arange(-0.01, 0.01001, 0.001),
                       'OMEGA500': np.arange(-0.125, 0.1251, 0.0125),
                       'OMEGA850': np.arange(-0.125, 0.1251, 0.0125),
                       'PBLH': np.arange(-150, 150.1, 15),
@@ -389,6 +393,7 @@ def getmapcontlevels(plotVar,
                       'PRECT': np.arange(-5, 5.01, 0.5),
                       'PS': np.arange(-4., 4.01, 0.5),
                       'PSL': np.arange(-4, 4.01, 0.5),
+                      'RELHUM': np.arange(-10, 10.1, 1),
                       'SHFLX': np.arange(-10, 10.1, 1.),
                       'SWCF': np.arange(-30, 30.1, 3),
                       'T': np.arange(-2, 2.1, 0.2),
@@ -436,6 +441,7 @@ def getmapcontlevels(plotVar,
                       'PRECT': np.arange(0, 20.1, 2),
                       'PS': np.arange(1004., 1013.1, 1),
                       'PSL': np.arange(1004, 1013.1, 1),
+                      'RELHUM': np.arange(0., 101., 10.),
                       'SHFLX': np.arange(0, 20., 1.),
                       'T': np.arange(290, 305.1, 1),
                       'TAUX': np.arange(-0.2, 0.201, 0.02),
@@ -470,7 +476,7 @@ def getzonmeancontlevels(plotVar,
         Matthew Woelfle
 
     Version Date:
-        2017-10-31
+        2018-06-18
 
     Args:
         plotVar - name of variable (in CESM parlance) for which contours are to
@@ -553,6 +559,203 @@ def getyearsubdirs(versionId):
                  if 'x' in yid else
                  'yrs_{:s}'.format(yid))
                 for yid in yrIds]
+
+
+def loadmodelruns(versionIds,
+                  climoCases=None,
+                  computeAllVars_flag=True,
+                  ncDir=None,
+                  ncSubDir=None,
+                  newRuns_flag=False,
+                  prect_flag=False,
+                  fns_flag=False,
+                  fnt_flag=False,
+                  regridVertical_flag=False,
+                  verbose_flag=False,
+                  **kwargs
+                  ):
+    """
+    Load cases for the cesm1to2 ITCZ study
+    """
+
+    # Set cases to load from climatologies
+    if climoCases is None:
+        climoCases = [
+            '01', '28', '36', 'ga7.66', '100', '113', '114', '116',
+            '118', '119', '119f', '119f_gamma', '119f_microp',
+            '125', '125f', '161', '194', '195'
+            ]
+
+    # Set file paths if not provided
+    if ncDir is None:
+        ncDir, ncSubDir, _ = setfilepaths()
+
+    # Set which variables to compute in addition to history variables
+    if computeAllVars_flag:
+        prect_flag = True
+        fns_flag = True
+        fnt_flag = True
+
+    # Get full case name for each versionId
+    fileBaseDict = getcasebase()
+
+    # Get full output file names for each version
+    loadSuffixes = {
+        versionIds[j]: (['_' + '{:02d}'.format(mon + 1) + '_climo.nc'
+                         for mon in range(12)]
+                        if versionIds[j] in climoCases
+                        else ['.cam.h0.' + '{:04d}'.format(yr + 2) +
+                              '-{:02d}'.format(mon+1) + '.nc'
+                              for mon in range(12)
+                              for yr in range(1)
+                              ])
+        for j in range(len(versionIds))
+        }
+
+    # Create list of files to load
+    if newRuns_flag:
+        loadFileLists = {versionIds[j]: [ncDir + fileBaseDict[versionIds[j]] +
+                                         '/' +
+                                         ncSubDir +
+                                         fileBaseDict[versionIds[j]] +
+                                         loadSuffix
+                                         for loadSuffix in loadSuffixes]
+                         for j in range(len(versionIds))}
+    else:
+        loadFileLists = dict()
+        for vid in versionIds:
+            loadFileLists[vid] = [ncDir + fileBaseDict[vid] +
+                                  '/' +
+                                  ('atm/hist/'
+                                   if 'f' in vid
+                                   else ncSubDir) +
+                                  fileBaseDict[vid] +
+                                  loadSuffix
+                                  for loadSuffix in loadSuffixes[vid]]
+
+    # Open netcdf file(s)
+    dataSets = {versionId: xr.open_mfdataset(loadFileLists[versionId],
+                                             decode_times=False)
+                for versionId in versionIds}
+
+    # Compute extra variable fields as requested
+    for vid in versionIds:
+        if verbose_flag:
+            print('Computing extra variables for {:s}'.format(vid))
+
+        # Compute PRECT
+        if prect_flag:
+            dataSets[vid]['PRECT'] = mwfn.calcprectda(dataSets[vid])
+
+        # Compute FNS
+        if fns_flag:
+            dataSets[vid]['FNS'] = mwfn.calcfnsda(dataSets[vid])
+
+        # Compute FNT
+        if fnt_flag:
+            dataSets[vid]['FNT'] = mwfn.calcfntda(dataSets[vid])
+
+    # Add version id to dataSets for easy access and bookkeeping
+    for vid in versionIds:
+        dataSets[vid].attrs['id'] = vid
+
+    # Obtain vertically regridded datasets from file or regrid (if requested)
+    if regridVertical_flag:
+        dataSets_rg = regriddatasets(
+            dataSets,
+            fileBaseDict=fileBaseDict,
+            ncDir=ncDir,
+            ncSubDir=ncSubDir,
+            versionIds=versionIds,
+            **kwargs
+            )
+    else:
+        dataSets_rg = {vid: [] for vid in versionIds}
+
+    return dataSets, dataSets_rg
+
+
+def loadobsdatasets(obsList=None,
+                    gpcp_flag=False,
+                    erai_flag=False,
+                    hadIsst_flag=False,
+                    hadIsstYrs=[1979, 2010],
+                    ):
+    """
+    Load observational datasets for comparison with simulations
+    """
+    # Parse list of requested sources if provided
+    if obsList is not None:
+        obsList = [j.lower() for j in obsList]
+        if 'gpcp' in obsList:
+            gpcp_flag = True
+        if 'erai' in obsList:
+            erai_flag = True
+        if 'hadisst' in obsList:
+            hadIsst_flag = True
+
+    # Create dictionary for holding observed datasets
+    obsDsDict = dict()
+
+    # Load GPCP
+    if gpcp_flag:
+        # Set directories for GPCP
+        gpcpDir = '/home/disk/eos9/woelfle/dataset/GPCP/climo/'
+        gpcpFile = 'gpcp_197901-201012.nc'
+        gpcpClimoFile = 'gpcp_197901-201012_climo.nc'
+
+        # Load GPCP for all years and add id
+        obsDsDict['gpcp'] = xr.open_dataset(gpcpDir + gpcpFile)
+        obsDsDict['gpcp'].attrs['id'] = 'GPCP_all'
+
+        # Load GPCP from both climo and add id
+        obsDsDict['gpcpClimo'] = xr.open_dataset(gpcpDir + gpcpClimoFile)
+        obsDsDict['gpcpClimo'].attrs['id'] = 'GPCP_climo'
+
+    # Load HadISST
+    if hadIsst_flag:
+        # Attempt to look at other averaging periods for HadISST
+        obsDsDict['hadIsst'] = mwfn.loadhadisst(
+            climoType='monthly',
+            daNewGrid=None,
+            kind='linear',
+            newGridFile=None,
+            newGridName='0.9x1.25',
+            newLat=None,
+            newLon=None,
+            qc_flag=False,
+            regrid_flag=True,
+            whichHad='all',  # 'pd_monclimo'
+            years=hadIsstYrs,
+            )
+
+    # Load ERA-I
+    if erai_flag:
+        obsDsDict['erai'] = mwfn.loaderai(
+            daNewGrid=None,
+            kind='linear',
+            loadClimo_flag=True,
+            newGridFile=None,
+            newGridName='0.9x1.25',
+            newLat=None,
+            newLon=None,
+            regrid_flag=False,
+            whichErai='monmean',
+            )
+        obsDsDict['erai3d'] = mwfn.loaderai(
+            daNewGrid=None,
+            kind='linear',
+            loadClimo_flag=True,
+            newGridFile=None,
+            newGridName='0.9x1.25',
+            newLat=None,
+            newLon=None,
+            regrid_flag=False,
+            whichErai='monmean.3d',
+            )
+
+    # Return datasets
+    return obsDsDict
 
 
 def plotbiasrelation(ds,
@@ -1046,10 +1249,15 @@ def plotlatlon(ds,
 
     # Get levels for contouring if not provided
     if levels is None:
-        levels = getmapcontlevels(plotVar,
-                                  diff_flag=any([diff_flag,
-                                                 rmRegMean_flag])
-                                  )
+        levels = getmapcontlevels(
+            (plotVar  # +
+             # (plev if np.ndim(ds[plotVar]) == 4
+             #  else '')
+             ),
+            diff_flag=any([diff_flag,
+                           rmRegMean_flag])
+            )
+
     if compcont is None:
         compcont = getcompcont(plotVar,
                                diff_flag=any([diff_flag,
@@ -1930,8 +2138,13 @@ def plotmultilatlon(dsDict,
                 caseSaveString = 'comp{:d}'.format(len(plotIdList))
             else:
                 caseSaveString = '_'.join(plotIdList)
+            # Get variable name for saving
+            varName = plotVar
+            if np.ndim(dsDict[goodPlotId][plotVar]) == 4:
+                # Add level if original field is 4d
+                varName = varName + str(plev)
             saveFile = (
-                plotVar + '_latlon_' +
+                varName + '_latlon_' +
                 caseSaveString + '_' +
                 tString +
                 '{:03.0f}'.format(tSteps[0]) + '-' +
@@ -2411,8 +2624,6 @@ def plotmultizonregmeanlines(dsDict,
                     shape=np.array([fx, fy]))
         plt.close('all')
 
-# %%
-
 
 def plotpressurelat(ds,
                     colorVar,
@@ -2717,6 +2928,7 @@ def plotpressurelat(ds,
             tempSub = saveSubDir
             saveSubDir = 'atm/meridslices/'
         print(saveDir + saveSubDir + saveFile)
+        print('gets here')
         mwp.savefig(saveDir + saveSubDir + saveFile,
                     shape=np.array([fx, fy]))
         saveSubDir = tempSub
@@ -3101,7 +3313,6 @@ def plotmultipressurelat(dsDict,
 
     # Save figure if requested
     if save_flag:
-
         # Set directory for saving
         if saveDir is None:
             saveDir = os.path.dirname(os.path.realpath(__file__))
@@ -3153,9 +3364,274 @@ def plotmultipressurelat(dsDict,
 
         # Save figure
         print(saveDir + saveSubDir + saveFile)
-        # mwp.savefig(saveDir + saveSubDir + saveFile,
-        #             shape=np.array([fx, fy]))
+        mwp.savefig(saveDir + saveSubDir + saveFile,
+                    shape=np.array([fx, fy]))
         if saveThenClose_flag:
             plt.close('all')
+
+
+def regriddatasets(dataSets,
+                   fileBaseDict=None,
+                   mp_flag=False,
+                   ncDir=None,
+                   ncSubDir=None,
+                   newLevs=None,
+                   regrid2file_flag=False,
+                   regridOverwrite_flag=False,
+                   regridVars=None,
+                   versionIds=None,
+                   ):
+    """
+    Vertically regrid a dictionary of datasets of CESM output
+    """
+
+    # Set new levels for regridding
+    if newLevs is None:
+        newLevs = np.array([100, 200, 275, 350, 425,
+                            500, 550, 600, 650, 700,
+                            750, 800, 850, 900, 950,
+                            975, 1000])
+
+    # Set variables to regrid if not provided
+    if regridVars is None:
+        regridVars = ['V', 'OMEGA', 'RELHUM', 'CLOUD', 'T', 'U',
+                      ]
+
+    # Set cases to regrid
+    if versionIds is None:
+        versionIds = list(dataSets.keys())
+
+    # Set location to look for previously regridded files
+    if ncDir is None:
+        ncDir, ncSubDir, _ = setfilepaths()
+
+    # Get full case name for each version id if not provided
+    if fileBaseDict is None:
+        fileBaseDict = getcasebase()
+
+    # Set flag to tell if need to do regridding for each dataset
+    regridIds = []
+
+    # First attempt to load each case from file
+    #   add cases to list to be regridded as they fail certain checks
+    dataSets_rg = dict()
+    for versionId in versionIds:
+        # Attempt to load previously regridded case from file
+        try:
+            ncFile = (ncDir +
+                      fileBaseDict[versionId] + '/' +
+                      ('atm/hist/'
+                       if 'f' in versionId
+                       else ncSubDir) +
+                      '3dregrid/' +
+                      fileBaseDict[versionId] +
+                      '.plevs.nc')
+            dataSets_rg[versionId] = xr.open_dataset(ncFile)
+        except OSError:
+            regridIds.append(versionId)
+            print('Previously regridding file unavaialble. ' +
+                  'Will regrid {:s}'.format(versionId))
+            continue
+
+        # Ensure all requested variables are present
+        if not all([x in dataSets_rg[versionId].data_vars
+                    for x in regridVars]):
+            regridIds.append(versionId)
+            print('Requested variables not all present. ' +
+                  'Will regrid {:s}'.format(versionId))
+            continue
+
+        # Check if all requested levels are present
+        if not all([x in dataSets_rg[versionId]['plev'].values
+                    for x in newLevs]):
+            regridIds.append(versionId)
+            print('Not all levels present. ' +
+                  'Will regrid {:s}'.format(versionId))
+            continue
+
+    # Perform regridding if cannot load appropriate regridded cases from
+    #   previously regridded files
+    if regridIds:
+        # Start timing clock
+        regridStartTime = datetime.datetime.now()
+        print(regridStartTime.strftime('--> Regrid start time: %X'))
+
+        # Regrid using multiprocessing
+        #   Seems buggier of late. Use at own risk.
+        if mp_flag:
+            # Regrid 3D variables using multiprocessing
+            #   Parallelizing over cases(?)
+            #   Need to be wary here to not run out of memory.
+            mpPool = mp.Pool(1)
+
+            # Load all datasets to memory to enable multiprocessing
+            for vid in regridIds:
+                print(vid)
+                for regridVar in regridVars:
+                    dataSets[vid][regridVar].load()
+                dataSets[vid]['PS'].load()
+                dataSets[vid]['hyam'].load()
+                dataSets[vid]['hybm'].load()
+                dataSets[vid]['P0'].load()
+
+            # Create input tuple for regridding to pressure levels
+            mpInList = [(dataSets[vid],
+                         regridVars,
+                         newLevs,
+                         {'hCoeffs': {
+                             'hyam': dataSets[vid]['hyam'].mean(
+                                 dim='time').values,
+                             'hybm': dataSets[vid]['hybm'].mean(
+                                 dim='time').values,
+                             'P0': dataSets[vid]['P0'].values[0]},
+                          'modelid': 'cesm',
+                          'psVar': 'PS',
+                          'verbose_flag': False}
+                         )
+                        for vid in regridIds]
+
+            # Call multiprocessing of regridding
+            # regriddedVars = mpPool.map(mwfn.regriddssigmatopres_mp,
+            #                            mpInList)
+            # regriddedVars = mpPool.map_async(mwfn.regriddssigmatopres_mp,
+            #                                 mpInList)
+            dsOut = mpPool.map_async(mwfn.convertsigmatopresds_mp,
+                                     mpInList)
+            # dsOut = mpPool.map(mwfn.convertsigmatopresds_mp,
+            #                   mpInList)
+
+            # Close multiprocessing pool
+            dsOut = dsOut.get()
+            mpPool.close()
+            mpPool.terminate()  # Not proper,
+            #                   #    but may be needed to work properly
+            mpPool.join()
+
+            # Convert dsOut from list of datasets to dictionary of datasets
+            dataSets_rg = {dsOut[j].id: dsOut[j]
+                           for j in range(len(dsOut))}
+        else:
+            # Regrid without multiprocessing
+            #   Some cases error out with mp for unknown reasons
+            for vid in regridIds:
+                dataSets_rg[vid] = mwfn.convertsigmatopresds(
+                    dataSets[vid],
+                    regridVars,
+                    newLevs,
+                    hCoeffs={'hyam': dataSets[vid]['hyam'].mean(
+                                 dim='time').values,
+                             'hybm': dataSets[vid]['hybm'].mean(
+                                 dim='time').values,
+                             'P0': dataSets[vid]['P0'].values[0]
+                             },
+                    modelid='cesm',
+                    psVar='PS',
+                    verbose_flag=False,
+                    )
+
+        # Write time elapsed at end of regridding
+        print('\n##------------------------------##')
+        print('Time to regrid with mp:')
+        print(datetime.datetime.now() - regridStartTime)
+        print('##------------------------------##\n')
+
+        # Write regridded datasets to file for quick future reloading.
+        if regrid2file_flag:
+            for versionId in regridIds:
+
+                # Set directory for saving netcdf file of regridded output
+                threeDdir = (ncDir + fileBaseDict[versionId] + '/' +
+                             ('atm/hist/'
+                              if 'f' in versionId
+                              else ncSubDir) +
+                             '3dregrid/')
+                # Set filename for saving netcdf file of regridded output
+                threeDfile = (fileBaseDict[versionId] +
+                              '.plevs.nc')
+
+                # Create directory if needed
+                if not os.path.exists(threeDdir):
+                    os.makedirs(threeDdir)
+
+                # Save netcdf file if possible
+                try:
+                    if os.path.exists(threeDdir + threeDfile):
+                        try:
+                            print('Writing {:s}'.format(
+                                  threeDdir + threeDfile))
+                            dataSets_rg[versionId].to_netcdf(
+                                path=threeDdir + threeDfile,
+                                mode='w')
+                        except OSError as ose:
+                            if regridOverwrite_flag:
+                                print('Overwriting existing file at:\n' +
+                                      threeDdir + threeDfile)
+                                os.remove(threeDdir + threeDfile)
+                                dataSets_rg[versionId].to_netcdf(
+                                    path=threeDdir + threeDfile,
+                                    mode='w')
+                            else:
+                                raise OSError(
+                                    'File already exists:\n' +
+                                    threeDdir + threeDfile)
+                        except RuntimeError:
+                            continue
+                    else:
+                        dataSets_rg[versionId].to_netcdf(
+                            path=threeDdir + threeDfile,
+                            mode='w')
+                except ValueError:
+                    raise ValueError('probably related to datetime.')
+
+    return dataSets_rg
+
+
+def setfilepaths(newRuns_flag=False):
+    """
+    Set host specific variables and filepaths
+
+    Author:
+        Matthew Woelfle (mdwoelfle@gmail.com)
+
+    Version Date:
+        2018-05-23
+
+    Args:
+        N/A
+
+    Kwargs:
+        newRuns_flag - True to change directorys for new runs
+            (on yslogin only!)
+
+    Returns:
+        ncDir - directory in which netcdf case directories are stored
+        ncSubDir - directory within case directory to search for netcdfs
+        saveDir - directory to which figures will be saved
+
+    Notes:
+        fullPathForHistoryFileDirectory = (ncDir + fullCaseName +
+                                           os.sep + ncSubDir)
+    """
+
+    if gethostname() in ['stable', 'challenger', 'p', 'fog']:
+        ncDir = '/home/disk/eos9/woelfle/cesm/nobackup/cesm1to2/'
+        ncSubDir = '0.9x1.25/'
+        saveDir = ('/home/disk/user_www/woelfle/cesm1to2/')
+
+    elif gethostname() == 'woelfle-laptop':
+        ncDir = 'C:\\Users\\woelfle\\Documents\\UW\\CESM\\hist\\'
+        ncSubDir = ''
+        saveDir = 'C:\\Users\\woelfle\\Documents\\UW\\CESM\\figs\\'
+
+    elif gethostname()[0:6] in ['yslogi', 'geyser', 'cheyen']:
+        if newRuns_flag:
+            ncDir = '/glade/scratch/woelfle/archive/'
+            ncSubDir = 'atm/hist/'
+        else:
+            ncDir = '/glade/p/cgd/amp/people/hannay/amwg/climo/'
+            ncSubDir = '0.9x1.25/'
+        saveDir = '/glade/work/woelfle/figs/cesm1to2/'
+
+    return (ncDir, ncSubDir, saveDir)
 
 # %%Do other stuff

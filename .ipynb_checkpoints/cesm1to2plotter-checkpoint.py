@@ -233,13 +233,23 @@ def getcasebase(versionId=None,
                     '119': 'b.e15.B1850.f09_g16.pi_control.all.119',
                     '119f': 'f.2000_DEV.f09_f09.pd_control.119',
                     '119f_gamma': 'f.2000_DEV.f09_f09.pd_gamma.119',
-                    '119f_microp': 'f.2000_DEV.f09_f09.pd_microp.119',
+                    '119f_ice': 'f.2000_DEV.f09_f09.pd_ice.119',
                     '119f_liqss': 'f.2000_DEV.f09_f09.pd_liqss.119',
+                    '119f_microp': 'f.2000_DEV.f09_f09.pd_microp.119',
+                    '119f_pra': 'f.2000_DEV.f09_f09.pd_pra.119',
                     '125': 'b.e20.B1850.f09_g16.pi_control.all.125',
                     '125f': 'f.2000_DEV.f09_f09.pd_control.125',
                     '161': 'b.e20.BHIST.f09_g17.20thC.161_01',
                     '194': 'b.e20.B1850.f09_g17.pi_control.all.194',
                     '195': 'b.e20.B1850.f09_g17.pi_control.all.195',
+                    '297f': 'f.2000.f09_f09.pd_control.cesm20',
+                    '297f_microp': 'f.2000.f09_f09.pd_microp.cesm20',
+                    '297f_pra': 'f.2000.f09_f09.pd_pra.cesm20',
+                    '297f_sp': 'f.2000.f09_f09.pd_spcontrol.cesm20',
+                    'cesm20f': 'f.2000.f09_f09.pd_control.cesm20',
+                    'cesm20f_microp': 'f.2000.f09_f09.pd_microp.cesm20',
+                    'cesm20f_pra': 'f.2000.f09_f09.pd_pra.cesm20',
+                    'cesm20f_sp': 'f.2000.f09_f09.pd_spcontrol.cesm20',
                     }
 
     # Return as requested
@@ -316,13 +326,23 @@ def getcolordict():
             '119': '#9467bd',
             '119f': '#9467bd',
             '119f_gamma': '#9467bd',
+            '119f_ice': '#9467bd',
             '119f_liqss': '#9467bd',
             '119f_microp': '#9467bd',
+            '119f_pra': '#9467bd',
             '125': '#8c564b',
             '125f': '#8c564b',
             '161': '#e377c2',
             '194': '#7f7f7f',
             '195': '#bcbd22',
+            '297f': '#42d1f4',
+            '297f_microp': '#42d1f4',
+            '297f_pra': '#42d1f4',
+            '297f_sp': '#42d1f4',
+            'cesm20f': '#42d1f4',
+            'cesm20f_microp': '#42d1f4',
+            'cesm20f_pra': '#42d1f4',
+            'cesm20f_sp': '#42d1f4',
             'obs': [0, 0, 0],
             }
 
@@ -343,7 +363,7 @@ def getloadfilelists(versionIds,
         fileBaseDict = getcasebase()
     
     loadFileLists = dict()
-    if gethostname() in ['stable', 'challenger', 'p', 'fog']:
+    if gethostname() in getuwmachlist():
         for vid in versionIds:
             loadFileLists[vid] = [ncDir + fileBaseDict[vid] +
                                   '/' +
@@ -354,7 +374,7 @@ def getloadfilelists(versionIds,
                                   loadSuffix
                                   for loadSuffix in loadSuffixes[vid]
                                  ]
-    elif gethostname()[0:6] in ['yslogi', 'geyser', 'cheyen']:
+    elif gethostname()[0:6] in getncarmachlist(6):
 
         # Set info for "runs of convenience" from NCAR
         cecileCases = ['01', '28', '36', 'ga7.66', '100', '113', '114',
@@ -363,8 +383,10 @@ def getloadfilelists(versionIds,
         cecileSubDir = '0.9x1.25/'
         
         # Set info for runs by me
-        woelfleCases = ['119f', '119f_gamma', '119f_microp', 
-                        '119f_liqss', '125f']
+        woelfleCases = ['119f', '119f_gamma', '119f_ice', '119f_liqss',
+                        '119f_microp', '119f_pra', '125f',
+                        '297f', '297f_microp', '297f_pra', '297f_sp',
+                        'cesm20f', 'cesm20f_microp', 'cesm20f_pra', 'cesm20f_sp']
         woelfleClimoDir = '/glade2/work/woelfle/cesm1to2/climos/'
         woelfleClimoSubDir = ''
         woelfleRawDir = '/glade2/scratch2/woelfle/archive/'
@@ -441,13 +463,23 @@ def getmarkerdict():
             '119': 'o',
             '119f': 's',
             '119f_gamma': '^',
+            '119f_ice': '*',
             '119f_liqss': 'd',
             '119f_microp': 'v',
+            '119f_pra': '<',
             '125': 'o',
             '125f': 's',
             '161': 'o',
             '194': 'o',
             '195': 'o',
+            '297f': 's',
+            '297f_microp': 'v',
+            '297f_pra': '<',
+            '297f_sp': '+',
+            'cesm20f': 's',
+            'cesm20f_microp': 'v',
+            'cesm20f_pra': '<',
+            'cesm20f_sp': '+',
             'obs': 'o',
             }
 
@@ -568,6 +600,17 @@ def getmapcontlevels(plotVar,
     return levels
 
 
+def getncarmachlist(nchars=6):
+    """
+    Return list of prefixes for NCAR/UCAR machines
+    - Only returns first nchars characters for each machine
+    """
+
+    ncarMachList = ['caldera', 'cheyenne', 'geyser', 'pronghorn', 'yslogin']
+    
+    return [machName[0:nchars] for machName in ncarMachList]
+
+
 def getquiverprops(uVar,
                    vVar,
                    plev=None,
@@ -612,6 +655,30 @@ def getquiverprops(uVar,
     return {'quiverScale': quiverScale,
             'uRef': uRef,
             'Uref': uRef}
+
+
+def getregriddedfilename(versionIds,
+                         loadSuffixes,
+                         climo_flag=True,
+                         fileBaseDict=None,
+                         nyrs=1,
+                         yr0=2,
+                         ):
+    
+    raise NotImplementedError('Not working yet. Too many things ' +
+                              'to track for the way my code is ' +
+                              'currently structured.')
+
+
+def getuwmachlist(nchars=30):
+    """
+    Return list of machines at UW
+    - only returns first nchars characters of the machine name
+    """
+    
+    uwMachList = ['stable', 'challenger', 'p', 'fog']
+    
+    return [machName[0:nchars] for machName in uwMachList]
 
 
 def getzonmeancontlevels(plotVar,
@@ -710,7 +777,7 @@ def getyearsubdirs(versionId):
 
 def loadmodelruns(versionIds,
                   climoCases=None,
-                  computeAllVars_flag=True,
+                  computeAll2DVars_flag=True,
                   ncDir=None,
                   ncSubDir=None,
                   newRuns_flag=False,
@@ -718,6 +785,7 @@ def loadmodelruns(versionIds,
                   fns_flag=False,
                   fnt_flag=False,
                   loadClimo_flag=True,
+                  lts_flag=True,
                   regridVertical_flag=False,
                   verbose_flag=False,
                   **kwargs
@@ -739,7 +807,7 @@ def loadmodelruns(versionIds,
         ncDir, ncSubDir, _ = setfilepaths()
 
     # Set which variables to compute in addition to history variables
-    if computeAllVars_flag:
+    if computeAll2DVars_flag:
         prect_flag = True
         fns_flag = True
         fnt_flag = True
@@ -779,23 +847,6 @@ def loadmodelruns(versionIds,
                                              decode_times=False)
                 for versionId in versionIds}
 
-    # Compute extra variable fields as requested
-    for vid in versionIds:
-        if verbose_flag:
-            print('Computing extra variables for {:s}'.format(vid))
-
-        # Compute PRECT
-        if prect_flag:
-            dataSets[vid]['PRECT'] = mwfn.calcprectda(dataSets[vid])
-
-        # Compute FNS
-        if fns_flag:
-            dataSets[vid]['FNS'] = mwfn.calcfnsda(dataSets[vid])
-
-        # Compute FNT
-        if fnt_flag:
-            dataSets[vid]['FNT'] = mwfn.calcfntda(dataSets[vid])
-
     # Add version id to dataSets for easy access and bookkeeping
     for vid in versionIds:
         dataSets[vid].attrs['id'] = vid
@@ -813,6 +864,30 @@ def loadmodelruns(versionIds,
     else:
         dataSets_rg = {vid: [] for vid in versionIds}
 
+    # Compute extra variable fields as requested
+    for vid in versionIds:
+        if verbose_flag:
+            print('Computing extra variables for {:s}'.format(vid))
+
+        # Compute PRECT
+        if prect_flag:
+            dataSets[vid]['PRECT'] = mwfn.calcprectda(dataSets[vid])
+
+        # Compute FNS
+        if fns_flag:
+            dataSets[vid]['FNS'] = mwfn.calcfnsda(dataSets[vid])
+
+        # Compute FNT
+        if fnt_flag:
+            dataSets[vid]['FNT'] = mwfn.calcfntda(dataSets[vid])
+
+        # Compute LTS
+        if lts_flag:
+            try:
+                dataSets[vid]['LTS'] = mwfn.calcltsda(dataSets_rg[vid])
+            except TypeError:
+                print('Cannot compute LTS for {:s}'.format(vid))
+        
     return dataSets, dataSets_rg
 
 
@@ -3258,17 +3333,14 @@ def plotmultipressurelat(dsDict,
     elif len(plotIdList) == 9:
         if cbarOrientation == 'vertical':
             # Set figure window size
-            if np.diff(latLim) >= 50:
-                hf.set_size_inches(16.25, 6.75, forward=True)
-            else:
-                hf.set_size_inches(16.25, 5.75, forward=True)
+            hf.set_size_inches(13, 9, forward=True)
 
             # Set up subplots
             gs = gridspec.GridSpec(3, 4,
                                    height_ratios=[1, 1, 1],
-                                   hspace=0.00,
+                                   hspace=0.2,
                                    width_ratios=[30, 30, 30, 1],
-                                   wspace=0.2,
+                                   wspace=0.33,
                                    left=0.04,
                                    right=0.96,
                                    bottom=0.00,
@@ -3278,27 +3350,15 @@ def plotmultipressurelat(dsDict,
             # Set gridspec colorbar location
             cbColInd = 3
             cbRowInd = 0
-            cbar_xoffset = -0.01
+            cbar_xoffset = -0.03
 
+            # Set gridspec index order
+            colInds = [0, 1, 2, 0, 1, 2, 0, 1, 2]
+            rowInds = [0, 0, 0, 1, 1, 1, 2, 2, 2]
+            
         elif cbarOrientation == 'horizontal':
-            # Set figure window size
-            hf.set_size_inches(14, 12, forward=True)
-
-            # Set up subplots
-            gs = gridspec.GridSpec(4, 3,
-                                   height_ratios=[20, 20, 20, 1],
-                                   hspace=0.5,
-                                   width_ratios=[1, 1, 1],
-                                   wspace=0.5,
-                                   )
-
-            # Set gridspec colorbar location
-            cbColInd = 0
-            cbRowInd = 3
-
-        # Set gridspec index order
-        colInds = [0, 1, 2, 0, 1, 2, 0, 1, 2]
-        rowInds = [0, 0, 0, 1, 1, 1, 2, 2, 2]
+            raise NotImplementedError('Horizontal. colorbar not supported ' +
+                                      'for 6 panel plot')
 
     # Plot maps
     skippedPlotCount = 0
@@ -3556,39 +3616,52 @@ def regriddatasets(dataSets,
     # First attempt to load each case from file
     #   add cases to list to be regridded as they fail certain checks
     dataSets_rg = dict()
-    for versionId in versionIds:
+    threeDdir = dict()
+    threeDfile = dict()
+    for vid in versionIds:
+        # Set directory for saving netcdf file of regridded output
+        if gethostname() in getuwmachlist():
+            threeDdir[vid] = (ncDir + fileBaseDict[vid] + '/' +
+                              ('atm/hist/'
+                               if 'f' in vid
+                               else ncSubDir) +
+                              '3dregrid/')
+        elif gethostname()[0:6] in getncarmachlist():
+            threeDdir[vid] = (ncDir + fileBaseDict[vid] + '/' +
+                              ncSubDir +
+                              '3dregrid/')
+
+        # Set filename for saving netcdf file of regridded output
+        threeDfile[vid] = (fileBaseDict[vid] +
+                           '.plevs.nc')
+
         # Attempt to load previously regridded case from file
         try:
-            ncFile = (ncDir +
-                      fileBaseDict[versionId] + '/' +
-                      ('atm/hist/'
-                       if 'f' in versionId
-                       else ncSubDir) +
-                      '3dregrid/' +
-                      fileBaseDict[versionId] +
-                      '.plevs.nc')
-            dataSets_rg[versionId] = xr.open_dataset(ncFile)
+            dataSets_rg[vid] = xr.open_dataset(threeDdir[vid] + threeDfile[vid])
         except OSError:
-            regridIds.append(versionId)
-            print('Previously regridding file unavaialble. ' +
-                  'Will regrid {:s}'.format(versionId))
+            regridIds.append(vid)
+            print('Previously regridded file unavaialble. ' +
+                  'Will regrid {:s}'.format(vid))
             continue
 
         # Ensure all requested variables are present
-        if not all([x in dataSets_rg[versionId].data_vars
+        if not all([x in dataSets_rg[vid].data_vars
                     for x in regridVars]):
-            regridIds.append(versionId)
+            regridIds.append(vid)
             print('Requested variables not all present. ' +
-                  'Will regrid {:s}'.format(versionId))
+                  'Will regrid {:s}'.format(vid))
             continue
 
         # Check if all requested levels are present
-        if not all([x in dataSets_rg[versionId]['plev'].values
+        if not all([x in dataSets_rg[vid]['plev'].values
                     for x in newLevs]):
-            regridIds.append(versionId)
+            regridIds.append(vid)
             print('Not all levels present. ' +
-                  'Will regrid {:s}'.format(versionId))
+                  'Will regrid {:s}'.format(vid))
             continue
+        
+        # Return success of loading from file
+        print('Succesfully loaded 3D fields for {:s}'.format(vid))
 
     # Perform regridding if cannot load appropriate regridded cases from
     #   previously regridded files
@@ -3655,6 +3728,7 @@ def regriddatasets(dataSets,
             # Regrid without multiprocessing
             #   Some cases error out with mp for unknown reasons
             for vid in regridIds:
+                print('Regridding {:s}...'.format(vid))
                 dataSets_rg[vid] = mwfn.convertsigmatopresds(
                     dataSets[vid],
                     regridVars,
@@ -3678,16 +3752,21 @@ def regriddatasets(dataSets,
 
         # Write regridded datasets to file for quick future reloading.
         if regrid2file_flag:
-            for versionId in regridIds:
-
-                # Set directory for saving netcdf file of regridded output
-                threeDdir = (ncDir + fileBaseDict[versionId] + '/' +
-                             ('atm/hist/'
-                              if 'f' in versionId
-                              else ncSubDir) +
-                             '3dregrid/')
+            for vid in regridIds:
+                if gethostname() in getuwmachlist():
+                    # Set directory for saving netcdf file of regridded output
+                    threeDdir = (ncDir + fileBaseDict[vid] + '/' +
+                                 ('atm/hist/'
+                                  if 'f' in vid
+                                  else ncSubDir) +
+                                 '3dregrid/')
+                elif gethostname()[0:6] in getncarmachlist(6):
+                    # Set directory for saving netcdf file of regridded output
+                    threeDdir = (ncDir + fileBaseDict[vid] + '/' +
+                                 ncSubDir +
+                                 '3dregrid/')
                 # Set filename for saving netcdf file of regridded output
-                threeDfile = (fileBaseDict[versionId] +
+                threeDfile = (fileBaseDict[vid] +
                               '.plevs.nc')
 
                 # Create directory if needed
@@ -3700,25 +3779,28 @@ def regriddatasets(dataSets,
                         try:
                             print('Writing {:s}'.format(
                                   threeDdir + threeDfile))
-                            dataSets_rg[versionId].to_netcdf(
+                            dataSets_rg[vid].to_netcdf(
                                 path=threeDdir + threeDfile,
-                                mode='w')
+                                mode='a')
                         except OSError as ose:
                             if regridOverwrite_flag:
                                 print('Overwriting existing file at:\n' +
                                       threeDdir + threeDfile)
                                 os.remove(threeDdir + threeDfile)
-                                dataSets_rg[versionId].to_netcdf(
+                                dataSets_rg[vid].to_netcdf(
                                     path=threeDdir + threeDfile,
                                     mode='w')
                             else:
                                 raise OSError(
                                     'File already exists:\n' +
-                                    threeDdir + threeDfile)
+                                    threeDdir + threeDfile +
+                                    ' Thus cannot write for {:s}'.format(vid))
                         except RuntimeError:
                             continue
                     else:
-                        dataSets_rg[versionId].to_netcdf(
+                        print('Writing {:s}'.format(
+                              threeDdir + threeDfile))
+                        dataSets_rg[vid].to_netcdf(
                             path=threeDdir + threeDfile,
                             mode='w')
                 except ValueError:
@@ -3757,7 +3839,7 @@ def setfilepaths(loadClimo_flag=True,
                                            os.sep + ncSubDir)
     """
 
-    if gethostname() in ['stable', 'challenger', 'p', 'fog']:
+    if gethostname() in getuwmachlist():
         ncDir = '/home/disk/eos9/woelfle/cesm/nobackup/cesm1to2/'
         ncSubDir = '0.9x1.25/'
         saveDir = ('/home/disk/user_www/woelfle/cesm1to2/')
@@ -3767,7 +3849,7 @@ def setfilepaths(loadClimo_flag=True,
         ncSubDir = ''
         saveDir = 'C:\\Users\\woelfle\\Documents\\UW\\CESM\\figs\\'
 
-    elif gethostname()[0:6] in ['yslogi', 'geyser', 'cheyen']:
+    elif gethostname()[0:6] in getncarmachlist(6):
         if loadClimo_flag:
             ncDir = '/glade2/work/woelfle/cesm1to2/climos/'
             ncSubDir = ''

@@ -87,25 +87,26 @@ if __name__ == '__main__':
     testPlotErai_flag = False
 
     # Set name(s) of file(s) to load
-    versionIds = [  # '01',
-                  # '28',
-                  # '36',
-                  # 'ga7.66',
+    versionIds = ['01',
+                  '28',
+                  '36',
+                  'ga7.66',
                   # '100',
                   # '113',
                   # '114',
                   # '116',
                   # '118',
                   '119',
-                  '119f',
-                  '119f_gamma',
-                  '119f_microp',
-                  '119f_liqss',
+                  # '119f',
+                  # '119f_gamma',
+                  # '119f_microp',
+                  # '119f_liqss',
                   '125',
-                  '125f',
-                  # '161',
-                  # '194',
-                  # '195'
+                  # '125f',
+                  '161',
+                  '194',
+                  '195'
+                  '297'
                   ]
 
     # Set levels for vertically regridding

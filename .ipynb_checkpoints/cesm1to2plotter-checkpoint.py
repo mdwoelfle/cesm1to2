@@ -61,12 +61,14 @@ def calcregmeanindex(ds,
     - CPacShear - central Pacific wind shear (850-200)
     - CTI - cold tongue index
     - dITCZ - double-ITCZ index
+    - dpdy_epac - East Pacific meridonal PS gradient
     - dSLP - Eq. Pacific SLP gradient (~Walker strength)
-    - dSSTdy_epac - East Pacific Meridional SST gradient
+    - dSSTdy_epac - East Pacific meridional SST gradient
     - fnsasym - Asymmetry in net surface flux over ocean only
-    - walker - Walker circulation index (based on pressure)
     - pai - precipitation asymmetry index
     - pcent - precipitation centroid
+    - sepsst - southeast Pacific SST metric (still in flux)
+    - walker - Walker circulation index (based on pressure)
     """
 
     # Choose appropriate index to compute
@@ -163,6 +165,20 @@ def calcregmeanindex(ds,
                                             precipVar=indexVar,
                                             qc_flag=qc_flag)
 
+    elif indexName.lower() in ['sepacsst', 'sepsst']:
+        # Assign default index if none provided
+        if indexType is None:
+            indexType = 'tropicalRelative'
+        if indexVar is None:
+            indexVar = 'TS'
+        
+        # Compute southeast Pacific SST metric
+        indexDa = mwfn.calcdssepsstindex(ds,
+                                         indexType=indexType,
+                                         indexVar=indexVar,
+                                         ocnOnly_flag=ocnOnly_flag,
+                                         )
+        
     elif indexName.lower() in ['walker', 'dslp']:
         # Assign default index if none provided
         if indexType is None:
@@ -242,6 +258,7 @@ def getcasebase(versionId=None,
                     '161': 'b.e20.BHIST.f09_g17.20thC.161_01',
                     '194': 'b.e20.B1850.f09_g17.pi_control.all.194',
                     '195': 'b.e20.B1850.f09_g17.pi_control.all.195',
+                    '297': 'b.e20.B1850.f09_g17.pi_control.all.297',
                     '297f': 'f.2000.f09_f09.pd_control.cesm20',
                     '297f_microp': 'f.2000.f09_f09.pd_microp.cesm20',
                     '297f_pra': 'f.2000.f09_f09.pd_pra.cesm20',
@@ -335,6 +352,7 @@ def getcolordict():
             '161': '#e377c2',
             '194': '#7f7f7f',
             '195': '#bcbd22',
+            '297': '#42d1f4',
             '297f': '#42d1f4',
             '297f_microp': '#42d1f4',
             '297f_pra': '#42d1f4',
@@ -376,20 +394,30 @@ def getloadfilelists(versionIds,
                                  ]
     elif gethostname()[0:6] in getncarmachlist(6):
 
-        # Set info for "runs of convenience" from NCAR
+        # Directories on NCAR systems may be all screwy due to changes to file
+        #   system on 208-07-11 
+
+        # Set info for "runs of convenience" from Celice at NCAR
         cecileCases = ['01', '28', '36', 'ga7.66', '100', '113', '114',
                        '116', '118','119', '125', '161', '194', '195']
-        cecileDir = '/glade/p/cgd/amp/people/hannay/amwg/climo/'
+        cecileDir = '/glade/p_old/cgd/amp/people/hannay/amwg/climo/'
         cecileSubDir = '0.9x1.25/'
+
+        # Set info for release runs from NCAR
+        releaseCases = ['297']
+        releaseDir = '/glade/p_old/cesm0005/archive/'
+        releaseSubDir = 'atm/hist/'
+        releaseClimoDir = '/gpfs/fs1/work/woelfle/cesm1to2/climos/'
+        releaseClimoSubDir = '131-139/'
         
         # Set info for runs by me
         woelfleCases = ['119f', '119f_gamma', '119f_ice', '119f_liqss',
                         '119f_microp', '119f_pra', '125f',
                         '297f', '297f_microp', '297f_pra', '297f_sp',
                         'cesm20f', 'cesm20f_microp', 'cesm20f_pra', 'cesm20f_sp']
-        woelfleClimoDir = '/glade2/work/woelfle/cesm1to2/climos/'
+        woelfleClimoDir = '/gpfs/fs1/work/woelfle/cesm1to2/climos/'
         woelfleClimoSubDir = ''
-        woelfleRawDir = '/glade2/scratch2/woelfle/archive/'
+        woelfleRawDir = '/gpfs/fs1/scratch/woelfle/archive/'
         woelfleRawSubDir = 'atm/hist/'
 
         for vid in versionIds:
@@ -401,6 +429,14 @@ def getloadfilelists(versionIds,
                                       loadSuffix
                                       for loadSuffix in getloadsuffix(vid,
                                                                       climo_flag=True)]
+            elif vid in releaseCases:
+                loadFileLists[vid] = [(releaseClimoDir if climo_flag else releaseDir) + 
+                                      fileBaseDict[vid] + '/' +
+                                      (releaseClimoSubDir if climo_flag else releaseSubDir) +
+                                      fileBaseDict[vid] +
+                                      loadSuffix
+                                      for loadSuffix in getloadsuffix(vid,
+                                                                      climo_flag=climo_flag)]
             else:
                 loadFileLists[vid] = [(woelfleClimoDir if climo_flag else woelfleRawDir) + 
                                       fileBaseDict[vid] + '/' +
@@ -472,6 +508,7 @@ def getmarkerdict():
             '161': 'o',
             '194': 'o',
             '195': 'o',
+            '297': 'o',
             '297f': 's',
             '297f_microp': 'v',
             '297f_pra': '<',
@@ -896,6 +933,7 @@ def loadobsdatasets(obsList=None,
                     erai_flag=False,
                     hadIsst_flag=False,
                     hadIsstYrs=[1979, 2010],
+                    whichHad='all',
                     ):
     """
     Load observational datasets for comparison with simulations
@@ -915,60 +953,164 @@ def loadobsdatasets(obsList=None,
 
     # Load GPCP
     if gpcp_flag:
-        # Set directories for GPCP
-        gpcpDir = '/home/disk/eos9/woelfle/dataset/GPCP/climo/'
-        gpcpFile = 'gpcp_197901-201012.nc'
-        gpcpClimoFile = 'gpcp_197901-201012_climo.nc'
+        # Set load differently depending on system (UW vs UCAR)
+        if gethostname() in getuwmachlist():
+            # Set directories for GPCP
+            gpcpDir = '/home/disk/eos9/woelfle/dataset/GPCP/climo/'
+            gpcpFile = 'gpcp_197901-201012.nc'
+            gpcpClimoFile = 'gpcp_197901-201012_climo.nc'
 
-        # Load GPCP for all years and add id
-        obsDsDict['gpcp'] = xr.open_dataset(gpcpDir + gpcpFile)
-        obsDsDict['gpcp'].attrs['id'] = 'GPCP_all'
+            # Load GPCP for all years and add id
+            obsDsDict['gpcp'] = xr.open_dataset(gpcpDir + gpcpFile)
+            obsDsDict['gpcp'].attrs['id'] = 'GPCP_all'
 
-        # Load GPCP from both climo and add id
-        obsDsDict['gpcpClimo'] = xr.open_dataset(gpcpDir + gpcpClimoFile)
-        obsDsDict['gpcpClimo'].attrs['id'] = 'GPCP_climo'
+            # Load GPCP from both climo and add id
+            obsDsDict['gpcpClimo'] = xr.open_dataset(gpcpDir + gpcpClimoFile)
+            obsDsDict['gpcpClimo'].attrs['id'] = 'GPCP_climo'
+        elif gethostname()[0:6] in getncarmachlist(6):
+            gpcpDir = '/gpfs/p/cesm/amwg/amwg_data/obs_data/'
+            gpcpClimoFiles = [gpcpDir + 
+                              'GPCP_{:02d}_climo.nc'.format(mon + 1)
+                              for mon in range(12)]
+            
+            # Load GPCP for climo only (as this is all I can find easily)
+            obsDsDict['gpcpClimo'] = xr.open_mfdataset(gpcpClimoFiles,
+                                                       decode_times=False)
+            obsDsDict['gpcpClimo'].attrs['id'] = 'GPCP_climo'
+            obsDsDict['gpcpClimo'].attrs['climo_yrs'] = '1979-2009'
 
     # Load HadISST
     if hadIsst_flag:
-        # Attempt to look at other averaging periods for HadISST
-        obsDsDict['hadIsst'] = mwfn.loadhadisst(
-            climoType='monthly',
-            daNewGrid=None,
-            kind='linear',
-            newGridFile=None,
-            newGridName='0.9x1.25',
-            newLat=None,
-            newLon=None,
-            qc_flag=False,
-            regrid_flag=True,
-            whichHad='all',  # 'pd_monclimo'
-            years=hadIsstYrs,
-            )
+        # Set load differently depending on system (UW vs UCAR)
+        if gethostname() in getuwmachlist():
+            # Attempt to look at other averaging periods for HadISST
+            obsDsDict['hadIsst'] = mwfn.loadhadisst(
+                climoType='monthly',
+                daNewGrid=None,
+                kind='linear',
+                newGridFile=None,
+                newGridName='0.9x1.25',
+                newLat=None,
+                newLon=None,
+                qc_flag=False,
+                regrid_flag=True,
+                whichHad=whichHad,
+                years=hadIsstYrs,
+                )
+        elif gethostname()[0:6] in getncarmachlist(6):
+            # Options for :
+            #   _CL_ - 1992-2001 (climo)
+            #   _PD_ - 1999-2008 (climo)
+            #   _PI_ - 1870-1900 (climo)
+            #   all - 1870-2005 (all)
+            if whichHad in ['CL', 'PD', 'PI']:
+                hadIsstDir = '/gpfs/p/cesm/amwg/amwg_data/obs_data/'
+                hadIsstClimoFiles = [
+                    hadIsstDir + 
+                    'HadISST_{:s}_'.format(whichHad) +
+                    '{:02d}_climo.nc'.format(mon + 1)
+                    for mon in range(12)]
 
+                # Load HadISST for climos
+                obsDsDict['hadIsstClimo'] = xr.open_mfdataset(hadIsstClimoFiles,
+                                                              decode_times=False)
+                obsDsDict['hadIsstClimo'].attrs['id'] = 'HadISST_climo'
+                obsDsDict['hadIsstClimo'].attrs['climo_yrs'] = {
+                    'CL': '1992-2001',
+                    'PD': '1999-2008',
+                    'PI': '1870-1900'}[whichHad]
+            elif whichHad == 'all':
+                # Load full HadISST field
+                hadISSTfile = ('/gpfs/p/cesm/amwg/amwg_data/obs_data/' + 
+                               'sst.hadley.187001-200512.nc')
+                obsDsDict['hadIsst'] = xr.open_dataset(hadISSTfile)
+                obsDsDict['hadIsst'].attrs['id'] = 'HadISST'
+                obsDsDict['hadIsst'].attrs['yrs'] = '1870-2005'
+                
+                if obsDsDict['hadIsst'].lon.values.min() < 0:
+                    # Determine lenght of roll required
+                    rollDist = np.sum(obsDsDict['hadIsst'].lon.values < 0)
+
+                    # Roll entire dataset
+                    hadIsstDs = obsDsDict['hadIsst'].roll(lon=rollDist)
+
+                    # Update longitudes to be positive definite
+                    hadIsstDs['lon'].values = np.mod(
+                        hadIsstDs['lon'] + 360, 360)
+
+                # Subset to requested years
+                hadIsstDs_sub = hadIsstDs.loc[
+                        dict(time=slice('{:4d}01'.format(hadIsstYrs[0]),
+                                        '{:4d}31'.format(hadIsstYrs[1])))
+                        ]
+                
+                # Update attributes
+                hadIsstDs_sub.attrs['yrs'] = (
+                    '{:4d}-{:4d}'.format(hadIsstYrs[0], hadIsstYrs[1]))
+                hadIsstDs_sub.attrs['Comment'] = (
+                    'Subsetted output for given years')
+                
+                # Compute monthly means (i.e. seasonal cycle)
+                hadClimo = np.zeros([12,
+                                     hadIsstDs_sub['SST'].values.shape[1],
+                                     hadIsstDs_sub['SST'].values.shape[2]])
+                nmon = hadIsstDs_sub['SST'].values.shape[0]
+                for mon in range(12):
+                    hadClimo[mon, :, :] = hadIsstDs_sub['SST'].values[
+                        np.arange(mon, nmon, 12)].mean(axis=0)
+
+                # Construct climatological data array
+                obsDa = xr.DataArray(
+                    hadClimo,
+                    attrs=hadIsstDs_sub['SST'].attrs,
+                    coords={'time': hadIsstDs_sub['SST'].coords['time'][0:12],
+                            'lat': hadIsstDs_sub['SST'].coords['lat'],
+                            'lon': hadIsstDs_sub['SST'].coords['lon']},
+                    dims=hadIsstDs_sub['SST'].dims,
+                    )
+                # Transform to dataset for consistency
+                obsDsDict['hadIsstClimo'] = xr.Dataset(
+                    data_vars={'SST': obsDa})
+                obsDsDict['hadIsstClimo'].attrs['climo_yrs'] = (
+                    '{:4d}-{:4d}'.format(hadIsstYrs[0], hadIsstYrs[1]))
+                obsDsDict['hadIsstClimo'].attrs['id'] = 'HadISST_climo'
+                    
     # Load ERA-I
     if erai_flag:
-        obsDsDict['erai'] = mwfn.loaderai(
-            daNewGrid=None,
-            kind='linear',
-            loadClimo_flag=True,
-            newGridFile=None,
-            newGridName='0.9x1.25',
-            newLat=None,
-            newLon=None,
-            regrid_flag=False,
-            whichErai='monmean',
-            )
-        obsDsDict['erai3d'] = mwfn.loaderai(
-            daNewGrid=None,
-            kind='linear',
-            loadClimo_flag=True,
-            newGridFile=None,
-            newGridName='0.9x1.25',
-            newLat=None,
-            newLon=None,
-            regrid_flag=False,
-            whichErai='monmean.3d',
-            )
+        if gethostname() in getuwmachlist():
+            obsDsDict['erai'] = mwfn.loaderai(
+                daNewGrid=None,
+                kind='linear',
+                loadClimo_flag=True,
+                newGridFile=None,
+                newGridName='0.9x1.25',
+                newLat=None,
+                newLon=None,
+                regrid_flag=False,
+                whichErai='monmean',
+                )
+            obsDsDict['erai3d'] = mwfn.loaderai(
+                daNewGrid=None,
+                kind='linear',
+                loadClimo_flag=True,
+                newGridFile=None,
+                newGridName='0.9x1.25',
+                newLat=None,
+                newLon=None,
+                regrid_flag=False,
+                whichErai='monmean.3d',
+                )
+        elif gethostname()[0:6] in getncarmachlist(6):
+            eraiDir = '/gpfs/p/cesm/amwg/amwg_data/obs_data/'
+            eraiClimoFiles = [eraiDir + 
+                              'ERAI_{:02d}_climo.nc'.format(mon + 1)
+                              for mon in range(12)]
+
+            # Load ERAI for climo only (as this is all I can find easily)
+            obsDsDict['eraiClimo'] = xr.open_mfdataset(eraiClimoFiles,
+                                                       decode_times=False)
+            obsDsDict['eraiClimo'].attrs['id'] = 'ERAI_climo'
+            obsDsDict['eraiClimo'].attrs['climo_yrs'] = '????'
 
     # Return datasets
     return obsDsDict
@@ -1208,6 +1350,485 @@ def plotbiasrelation(ds,
 
     # Don't return anything for now.
     return
+
+
+def plotmetricvsversion(indexName,
+                        ds,
+                        indexType=None,
+                        legend_flag=True,
+                        makeFigure_flag=True,
+                        obsDs=None,
+                        obsVar=None,
+                        ocnOnly_flag=True,
+                        plotAnnMean_flag=True,
+                        plotPeriodMean_flag=True,
+                        plotSeasCyc_flag=True,
+                        plotObs_flag=True,
+                        plotVar=None,
+                        rmAnnMean_flag=False,
+                        save_flag=False,
+                        saveDir=None,
+                        tSteps=np.arange(0, 12),
+                        versionIds=None,
+                        yLim_annMean=None,
+                        yLim_periodMean=None,
+                        yLim_seasCyc=None,
+                        ):
+    """
+    Plot some predefined bias metric versus model version
+    
+    Available indices:
+        'dITCZ', 'PAI', 'pcent', 'dpdy_epac', dsstdy_epac', 'fnsasym',
+        'sepsst'
+    """
+
+    # Set default plot values
+    title = indexName
+    
+    # Set versions to plot
+    if versionIds is None:
+        versionIds = list(ds.keys())
+    
+    if indexName in ['dITCZ']:
+        if plotVar is None:
+            plotVar = 'PRECT'
+        if obsVar is None:
+            obsVar = ('precip' if 'precip' in obsDs else 'PRECT')
+        ocnOnly_flag = False
+        title = 'Double-ITCZ Index'
+        if yLim_annMean is None:
+            yLim_annMean = np.array([1, 3])
+        if yLim_periodMean is None:
+            yLim_periodMean = np.array([1, 3])
+        if yLim_seasCyc is None:
+            yLim_seasCyc = np.array([0, 6])
+    elif indexName.lower() in ['dpdy_epac']:
+        if plotVar is None:
+            plotVar = 'PS'
+        if obsVar is None:
+            obsVar = ('sp' if 'sp' in obsDs else 'PS')
+        ocnOnly_flag = True
+        title = 'dP/dy (E Pac)'
+        if yLim_annMean is None:
+            yLim_annMean = np.array([-1, 0])
+        if yLim_periodMean is None:
+            yLim_periodMean = np.array([-1, 1])
+        if yLim_seasCyc is None:
+            yLim = np.array([-1.5, 1.5])
+    elif indexName.lower() in ['dsstdy_epac']:
+        if plotVar is None:
+            plotVar = 'TS'
+        if obsVar is None:
+            obsVar = ('sst' if 'sst' in obsDs else 'SST')
+        ocnOnly_flag = True
+        title = 'dSST/dy (E. Pac)'
+        if yLim_annMean is None:
+            yLim_annMean = np.array([0, 2])
+        if yLim_periodMean is None:
+            yLim_periodMean = np.array([-1.2, 1])
+        if yLim_seasCyc is None:
+            yLim_seasCyc = np.array([-3, 3])
+    elif indexName.lower() in ['fnsasym']:
+        if plotVar is None:
+            plotVar = 'FNS'
+        if obsVar is None:
+            obsVar = None
+        ocnOnly_flag = True
+        title = 'FNS Asymmetry'
+        if yLim_annMean is None:
+            yLim_annMean = None
+        if yLim_periodMean is None:
+            yLim_periodMean = None
+        if yLim_seasCyc is None:
+            yLim_seasCyc = None
+    elif indexName in ['PAI']:
+        if plotVar is None:
+            plotVar = 'PRECT'
+        if obsVar is None:
+            obsVar = ('precip' if 'precip' in obsDs else 'PRECT')
+        ocnOnly_flag = False
+        title = 'PAI'
+        if yLim_annMean is None:
+            yLim_annMean = np.array([0, 0.5])
+        if yLim_periodMean is None:
+            yLim_periodMean = np.array([-1.5, 1.5])
+        if yLim_seasCyc is None:
+            yLim_seasCyc = np.array([-1.5, 1.5])
+    elif indexName.lower() in ['pcent']:
+        if plotVar is None:
+            plotVar = 'PRECT'
+        if obsVar is None:
+            obsVar = ('precip' if 'precip' in obsDs else 'PRECT')
+        ocnOnly_flag = False
+        title = 'Precipitation Centroid'
+        if yLim_annMean is None:
+            yLim_annMean = np.array([0, 2])
+        if yLim_periodMean is None:
+            yLim_periodMean = np.array([-10, 10])
+        if yLim_seasCyc is None:
+            yLim_seasCyc = np.array([-10, 10])
+    elif indexName.lower() in ['sepacsst', 'sepsst']:
+        if plotVar is None:
+            plotVar = 'TS'
+        if obsVar is None:
+            obsVar = ('sst' if 'sst' in obsDs else 'SST')
+        ocnOnly_flag = True
+        title = 'SE Pac. SST index'
+        if yLim_annMean is None:
+            yLim_annMean = None
+        if yLim_periodMean is None:
+            yLim_periodMean = None
+        if yLim_seasCyc is None:
+            yLim_seasCyc = None
+
+    # Create dictionary to hold mean values
+    annMean = dict()
+    timeMean = dict()
+    
+    # Get line properties
+    colorDict = getcolordict()
+    markerDict = getmarkerdict()
+
+    # Create figure for plotting
+    if makeFigure_flag and plotSeasCyc_flag:
+        hf = plt.figure()
+        hf.set_size_inches(6, 4.5,
+                           forward=True)
+
+    # Get line handles for returning
+    hlSeas = []
+
+    for vid in versionIds:
+        # Compute given index through time
+        indexDa = calcregmeanindex(ds[vid],
+                                   indexName,
+                                   indexType=indexType,
+                                   indexVar=plotVar,
+                                   ocnOnly_flag=ocnOnly_flag,
+                                   )
+
+        # Get index values and remove annual mean if requested
+        pData = (indexDa.values - indexDa.mean(dim='time').values
+                 if rmAnnMean_flag
+                 else indexDa.values)
+        if plotSeasCyc_flag:
+            hl, = plt.plot(np.arange(1, 13),
+                           pData,
+                           color=colorDict[vid],
+                           label=vid,
+                           marker=markerDict[vid],
+                           )
+            hlSeas.append(hl)
+        annMean[vid] = indexDa.mean(dim='time')
+        timeMean[vid] = indexDa.values[tSteps].mean()
+
+    # Repeat above for obs
+    if plotObs_flag:
+        # Compute given index through time
+        obsIndexDa = calcregmeanindex(obsDs,
+                                      indexName,
+                                      indexType=indexType,
+                                      indexVar=obsVar,
+                                      ocnOnly_flag=False,
+                                      qc_flag=False,
+                                      )
+        
+        # Get data for index
+        #   also remove annual mean if requested
+        try:
+            pData = (obsIndexDa.values -
+                     obsIndexDa.mean(dim='time').values
+                     if rmAnnMean_flag
+                     else obsIndexDa.values)
+        except ValueError:
+            pData = (obsIndexDa.values -
+                     obsIndexDa.mean(dim='month').values
+                     if rmAnnMean_flag
+                     else obsIndexDa.values)
+
+        if plotSeasCyc_flag:
+            # Plot time series
+            try:
+                hl, = plt.plot(np.arange(1, 13),
+                               pData,
+                               lw=2,
+                               c=colorDict['obs'],
+                               label=obsDs.id,
+                               marker=markerDict['obs']
+                               )
+            except ValueError:
+                # Compute monthly climatologies and plot
+                pData = np.reshape(pData,
+                                   [int(pData.size/12), 12]).mean(axis=0)
+                hl, = plt.plot(np.arange(1, 13),
+                               pData,
+                               lw=2,
+                               c=colorDict['obs'],
+                               label=obsDs.id,
+                               marker=markerDict['obs']
+                               )
+            hlSeas.append(hl)
+
+        # Compute annual means
+        try:
+            annMean['obs'] = obsIndexDa.mean(dim='time')
+        except ValueError:
+            annMean['obs'] = obsIndexDa.mean(dim='month')
+
+        # Compute mean over given timesteps
+        timeMean['obs'] = pData[tSteps].mean()
+
+    if plotSeasCyc_flag:
+        # Dress plot
+        plt.xticks(np.arange(1, 13))
+        plt.xlabel('Month')
+
+        plt.ylabel('{:s}'.format(title) +
+                   (' ({:s})'.format(indexDa.units)
+                    if indexDa.units is not None
+                    else '') +
+                   ('\n[Annual mean removed]' if rmAnnMean_flag else '')
+                   )
+        try:
+            plt.ylim(yLim_seasCyc)
+        except NameError:
+            pass
+        if legend_flag:
+            plt.legend(title='Version', ncol=2)
+
+        plt.title('Seasonal cycle of {:s}'.format(title) +
+                  ('\n[Annual mean removed]' if rmAnnMean_flag else '')
+                  )
+
+        # Add annotation of years used to compute climatology
+        if False:  # all([plotVar == 'TS', plotObs_flag]):
+            plt.annotate('(obs: {:d}-{:d})'.format(hadIsstYrs[0],
+                                                   hadIsstYrs[1]),
+                         xy=(1, 1),
+                         xycoords='axes fraction',
+                         horizontalalignment='right',
+                         verticalalignment='bottom',
+                         )
+
+        # Add grid
+        plt.grid()
+
+        # Clean up figure
+        if makeFigure_flag:
+            plt.tight_layout()
+
+        # Save figure if requested
+        if save_flag:
+            # Set directory for saving
+            if saveDir is None:
+                saveDir = setfilepaths()[2]
+
+            # Set file name for saving
+            tString = 'mon'
+            saveFile = ('seascyc_' + indexName.lower())
+
+            # Set saved figure size (inches)
+            fx, fy = hf.get_size_inches()
+
+            # Save figure
+            print(saveDir + saveFile)
+            mwp.savefig(saveDir + saveFile,
+                        shape=np.array([fx, fy]))
+            plt.close('all')
+
+    # Plot annual mean values
+    if plotAnnMean_flag:
+
+        # Make figure for plotting if needed
+        if makeFigure_flag:
+            hf = plt.figure()
+            hf.set_size_inches(6, 4.5, forward=True)
+        
+        # Plot annual mean index vs model version
+        for idx, vid in enumerate(versionIds):
+            plt.scatter(idx + 1,
+                        np.array(annMean[vid]),
+                        marker=markerDict[vid],
+                        c=colorDict[vid],
+                        s=80,
+                        )
+        if plotObs_flag:
+            plt.scatter([len(annMean)],
+                        annMean['obs'],
+                        marker=markerDict['obs'],
+                        c=colorDict['obs'],
+                        s=80,
+                        )
+
+        # Dress plot
+        plt.xticks(np.arange(1, len(annMean) + 1),
+                   ((versionIds + ['obs'])
+                    if 'obs' in annMean.keys()
+                    else versionIds))
+        plt.xlabel('Version')
+
+        plt.ylabel('{:s}'.format(title) +
+                   (' ({:s})'.format(indexDa.units)
+                   if indexDa.units is not None
+                   else '')
+                   )
+        try:
+            plt.ylim(yLim_annMean)
+        except NameError:
+            pass
+
+        plt.grid(ls='--')
+        plt.gca().set_axisbelow(True)
+
+        plt.title('Annual mean {:s}'.format(title))
+        
+        if makeFigure_flag:
+            plt.tight_layout()
+
+        # Save figure if requested
+        if save_flag:
+            # Set directory for saving
+            if saveDir is None:
+                saveDir = c1to2p.setfilepaths()[2]
+
+            # Set file name for saving
+            tString = 'mon'
+            saveFile = ('annmean_' + indexName.lower())
+
+            # Set saved figure size (inches)
+            fx, fy = hf.get_size_inches()
+
+            # Save figure
+            print(saveDir + saveSubDir + saveFile)
+            mwp.savefig(saveDir + saveSubDir + saveFile,
+                        shape=np.array([fx, fy]))
+            plt.close('all')
+
+    # Plot time mean values
+    if plotPeriodMean_flag:
+        
+        # Create figure for plotting
+        if makeFigure_flag:
+            plt.figure()
+            hf.set_size_inches(6, 4.5, forward=True)
+
+        for indx, vid in enumerate(versionIds):
+            plt.scatter(indx + 1,
+                        np.array(timeMean[vid]),
+                        marker=markerDict[vid],
+                        c=colorDict[vid],
+                        s=80,
+                        )
+        if plotObs_flag:
+            plt.scatter([len(timeMean)],
+                        timeMean['obs'],
+                        marker=markerDict['obs'],
+                        c=colorDict['obs'],
+                        s=80,
+                        )
+
+        # Dress plot
+        plt.xticks(np.arange(1, len(timeMean) + 1),
+                   ((versionIds + ['obs'])
+                    if 'obs' in timeMean.keys()
+                    else versionIds))
+        plt.xlabel('Version')
+
+        plt.ylabel('{:s}'.format(title) +
+                   (' ({:s})'.format(indexDa.units)
+                   if indexDa.units is not None
+                   else '')
+                   )
+        try:
+            plt.ylim(yLim_period)
+        except NameError:
+            pass
+
+        plt.grid(ls='--')
+        plt.gca().set_axisbelow(True)
+
+        monIds = ['J', 'F', 'M', 'A', 'M', 'J',
+                  'J', 'A', 'S', 'O', 'N', 'D']
+        tStepString = ''.join([monIds[tStep] for tStep in tSteps])
+        if tStepString == 'JFD':
+            tStepString = 'DJF'
+        plt.title('{:s} mean {:s}'.format(tStepString, title))
+        
+        if makeFigure_flag:
+            plt.tight_layout()
+        
+        # Save figure if requested
+        if save_flag:
+            # Set directory for saving
+            if saveDir is None:
+                saveDir = setfilepaths()[2]
+
+            # Set file name for saving
+            tString = 'mon'
+            saveFile = ('pdmean_' + tStepString +
+                        indexName.lower())
+
+            # Set saved figure size (inches)
+            fx, fy = hf.get_size_inches()
+
+            # Save figure
+            print(saveDir + saveFile)
+            mwp.savefig(saveDir + saveFile,
+                        shape=np.array([fx, fy]))
+            plt.close('all')
+
+    return hlSeas
+
+
+def plotmultimetricvsversion(
+    indexNames,
+    ds,
+    figSize=None,
+    obsDsDict=None,
+    save_flag=False,
+    saveDir=None,
+    **kwargs
+    ):
+    """
+    Plot multiple metrics on one figure.
+    Assumes only one of plotAnnMean_flag, plotPeriodMean_flag,
+        and plotSeasCyc_flag will be True
+    """
+    
+    if len(indexName) == 2:
+        hf = plt.figure()
+        if figSize is None:
+            hf.set_size_inches(6, 4.5, forward=True)
+        else:
+            hf.set_size_inches(figSize[0],
+                               figSize[1],
+                               forward=True)
+
+    for indexName in indexNames:
+        try:
+            obsDs = obsDsDict[indexName]
+        except TypeError:
+            obsDs = None
+        plotmetricvsversion(indexName,
+            ds,
+            makeFigure_flag=True,
+            obsDs=obsDsDict[indexName],
+            obsVar=None,
+            ocnOnly_flag=True,
+            plotAnnMean_flag=True,
+            plotPeriodMean_flag=True,
+            plotSeasCyc_flag=True,
+            plotObs_flag=True,
+            plotVar=None,
+            rmAnnMean_flag=False,
+            save_flag=False,
+            saveDir=None,
+            tSteps=np.arange(0, 12),
+            versionIds=None,
+            yLim_annMean=None,
+            yLim_periodMean=None,
+            yLim_seasCyc=None,
+            )
 
 
 def plotprecipcentroidvlon(dsList,
@@ -3851,7 +4472,7 @@ def setfilepaths(loadClimo_flag=True,
 
     elif gethostname()[0:6] in getncarmachlist(6):
         if loadClimo_flag:
-            ncDir = '/glade2/work/woelfle/cesm1to2/climos/'
+            ncDir = '/glade/work/woelfle/cesm1to2/climos/'
             ncSubDir = ''
         elif newRuns_flag:
             ncDir = '/glade/scratch/woelfle/archive/'

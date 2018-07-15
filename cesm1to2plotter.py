@@ -929,8 +929,9 @@ def loadmodelruns(versionIds,
 
 
 def loadobsdatasets(obsList=None,
-                    gpcp_flag=False,
+                    ceresEbaf_flag=False,
                     erai_flag=False,
+                    gpcp_flag=False,
                     hadIsst_flag=False,
                     hadIsstYrs=[1979, 2010],
                     whichHad='all',
@@ -941,15 +942,58 @@ def loadobsdatasets(obsList=None,
     # Parse list of requested sources if provided
     if obsList is not None:
         obsList = [j.lower() for j in obsList]
-        if 'gpcp' in obsList:
-            gpcp_flag = True
+        if 'ceresebaf' in obsList:
+            ceresEbaf_flag = True
         if 'erai' in obsList:
             erai_flag = True
+        if 'gpcp' in obsList:
+            gpcp_flag = True
         if 'hadisst' in obsList:
             hadIsst_flag = True
 
     # Create dictionary for holding observed datasets
     obsDsDict = dict()
+
+    # Load CERES-EBAF
+    if ceresEbaf_flag:
+        raise NotImplementedError('CERES-EBAF not set to load yet.')
+
+    # Load ERA-I
+    if erai_flag:
+        if gethostname() in getuwmachlist():
+            obsDsDict['erai'] = mwfn.loaderai(
+                daNewGrid=None,
+                kind='linear',
+                loadClimo_flag=True,
+                newGridFile=None,
+                newGridName='0.9x1.25',
+                newLat=None,
+                newLon=None,
+                regrid_flag=False,
+                whichErai='monmean',
+                )
+            obsDsDict['erai3d'] = mwfn.loaderai(
+                daNewGrid=None,
+                kind='linear',
+                loadClimo_flag=True,
+                newGridFile=None,
+                newGridName='0.9x1.25',
+                newLat=None,
+                newLon=None,
+                regrid_flag=False,
+                whichErai='monmean.3d',
+                )
+        elif gethostname()[0:6] in getncarmachlist(6):
+            eraiDir = '/gpfs/p/cesm/amwg/amwg_data/obs_data/'
+            eraiClimoFiles = [eraiDir + 
+                              'ERAI_{:02d}_climo.nc'.format(mon + 1)
+                              for mon in range(12)]
+
+            # Load ERAI for climo only (as this is all I can find easily)
+            obsDsDict['eraiClimo'] = xr.open_mfdataset(eraiClimoFiles,
+                                                       decode_times=False)
+            obsDsDict['eraiClimo'].attrs['id'] = 'ERAI_climo'
+            obsDsDict['eraiClimo'].attrs['climo_yrs'] = '????'
 
     # Load GPCP
     if gpcp_flag:
@@ -1074,43 +1118,6 @@ def loadobsdatasets(obsList=None,
                 obsDsDict['hadIsstClimo'].attrs['climo_yrs'] = (
                     '{:4d}-{:4d}'.format(hadIsstYrs[0], hadIsstYrs[1]))
                 obsDsDict['hadIsstClimo'].attrs['id'] = 'HadISST_climo'
-                    
-    # Load ERA-I
-    if erai_flag:
-        if gethostname() in getuwmachlist():
-            obsDsDict['erai'] = mwfn.loaderai(
-                daNewGrid=None,
-                kind='linear',
-                loadClimo_flag=True,
-                newGridFile=None,
-                newGridName='0.9x1.25',
-                newLat=None,
-                newLon=None,
-                regrid_flag=False,
-                whichErai='monmean',
-                )
-            obsDsDict['erai3d'] = mwfn.loaderai(
-                daNewGrid=None,
-                kind='linear',
-                loadClimo_flag=True,
-                newGridFile=None,
-                newGridName='0.9x1.25',
-                newLat=None,
-                newLon=None,
-                regrid_flag=False,
-                whichErai='monmean.3d',
-                )
-        elif gethostname()[0:6] in getncarmachlist(6):
-            eraiDir = '/gpfs/p/cesm/amwg/amwg_data/obs_data/'
-            eraiClimoFiles = [eraiDir + 
-                              'ERAI_{:02d}_climo.nc'.format(mon + 1)
-                              for mon in range(12)]
-
-            # Load ERAI for climo only (as this is all I can find easily)
-            obsDsDict['eraiClimo'] = xr.open_mfdataset(eraiClimoFiles,
-                                                       decode_times=False)
-            obsDsDict['eraiClimo'].attrs['id'] = 'ERAI_climo'
-            obsDsDict['eraiClimo'].attrs['climo_yrs'] = '????'
 
     # Return datasets
     return obsDsDict
@@ -2016,152 +2023,55 @@ def plotprecipcentroidvlon(dsList,
     return hf
 
 
-def plotlatlon(ds,
-               plotVar,
-               box_flag=False,
-               boxLat=np.array([-20, 20]),
-               boxLon=np.array([210, 260]),
-               caseString=None,
-               cbar_flag=True,
-               cbar_dy=-0.1,
-               cbar_height=0.02,
-               cMap=None,
-               compcont=None,
-               compcont_flag=True,
-               convertUnits_flag=True,
-               diff_flag=False,
-               diffDs=None,
-               diffPlev=None,
-               diffTSteps=None,
-               diffVar=None,
-               fontSize=12,
-               figDims=None,
-               latLim=np.array([-30, 30]),
-               latlbls=None,
-               levels=None,
-               lonLim=np.array([119.5, 270.5]),
-               lonlbls=None,
-               makeFigure_flag=True,
-               newUnits=None,
-               ocnOnly_flag=False,
-               plev=None,
-               qc_flag=False,
-               quiver_flag=False,
-               quiverDs=None,
-               quiverDiffDs=None,
-               quiverKey_flag=True,
-               quiverNorm_flag=False,
-               quiverScale=0.4,
-               quiverScaleVar=None,
-               quiverUnits='inches',
-               returnM_flag=True,  # MUST be true for now (bug)
-               rmRegLatLim=None,
-               rmRegLonLim=None,
-               rmRegMean_flag=False,
-               rmse_flag=False,
-               save_flag=False,
-               saveDir=None,
-               stampDate_flag=True,
-               subSamp=None,
-               tSteps=None,
-               tStepLabel_flag=True,
-               uRef=0.1,
-               uVar='TAUX',
-               vVar='TAUY',
-               verbose_flag=False,
-               **kwargs
-               ):
+def getlatlonpdata(ds,
+                   plotVar,
+                   tSteps,
+                   diff_flag=False,
+                   diffAsPct_flag=False,
+                   diffDs=None,
+                   diffPlev=None,
+                   diffTSteps=None,
+                   diffVar=None,
+                   ocnOnly_flag=False,
+                   plev=None,
+                   qc_flag=False,
+                   quiver_flag=False,
+                   quiverDs=None,
+                   quiverDiffDs=None,
+                   quiverNorm_flag=False,
+                   quiverScaleVar=None,
+                   rmRegMean_flag=False,
+                   rmRegLatLim=None,
+                   rmRegLonLim=None,
+                   uVar=None,
+                   vVar=None,
+                   ):
     """
-    Plot a map of a given dataset averaged over the specified timesteps
-
-    Version Date:
-        2018-03-13
+    Get array for plotitng a map
+    ** Started, but not implemented **
     """
-
-    # Set lats/lons to label if not provided
-    if latlbls is None:
-        latlbls = mwp.getlatlbls(latLim)
-    if lonlbls is None:
-        lonlbls = mwp.getlonlbls(lonLim)
-
-    # Get levels for contouring if not provided
-    if levels is None:
-        levels = getmapcontlevels(
-            (plotVar  # +
-             # (plev if np.ndim(ds[plotVar]) == 4
-             #  else '')
-             ),
-            diff_flag=any([diff_flag,
-                           rmRegMean_flag])
-            )
-
-    if compcont is None:
-        compcont = getcompcont(plotVar,
-                               diff_flag=any([diff_flag,
-                                              rmRegMean_flag])
-                               )
-
-    # Find colormap for means
-    if cMap is None:
-        cMap = mwp.getcmap(plotVar,
-                           diff_flag=any([diff_flag,
-                                          rmRegMean_flag])
-                           )
-
-    # Determine time steps for plotting
-    if tSteps is None:
-        tSteps = np.arange(0, ds[plotVar].shape[0], dtype=int)
-    if diffTSteps is None:
-        diffTSteps = tSteps
-    if verbose_flag:
-        print(tSteps)
-        if diff_flag:
-            print(diffTSteps)
-
-    # Determine differencing pressure level if not provided
+    
     if diffPlev is None:
         diffPlev = plev
-
-    # Set caseString for plotting
-    if caseString is None:
-        if diff_flag:
-            caseString = ds.id + '-' + diffDs.id
-        else:
-            caseString = ds.id
-
-    # Ensure diffVar is defined as non-None
+    if diffTSteps is None:
+        diffTSteps = tSteps
     if diffVar is None:
         diffVar = plotVar
-
-    # Define quiver datasets if needed
     if quiverDs is None:
         quiverDs = ds
     if quiverDiffDs is None:
         quiverDiffDs = diffDs
 
-    # Convert units as needed
-    (ds[plotVar].values,
-     ds[plotVar].attrs['units']) = mwfn.convertunit(
-        ds[plotVar].values,
-        ds[plotVar].units,
-        mwfn.getstandardunits(plotVar)
-        )
-    if diff_flag:
-        try:
-            (diffDs[diffVar].values,
-             diffDs[diffVar].attrs['units']) = mwfn.convertunit(
-                diffDs[diffVar].values,
-                diffDs[diffVar].units,
-                mwfn.getstandardunits(diffVar)
-                )
-        except TypeError:
-            pass
-
-    # Pull data for plotting contours
+    # Pull data for plotting color contours
     if np.ndim(ds[plotVar]) == 3:
         if diff_flag:
             pData = (ds[plotVar].values[tSteps, :, :].mean(axis=0) -
                      diffDs[diffVar].values[diffTSteps, :, :].mean(axis=0))
+            if diffAsPct_flag:
+                pData = (
+                    pData /
+                    diffDs[diffVar].values[diffTSteps, :, :].mean(axis=0)
+                    )
         else:
             pData = ds[plotVar].values[tSteps, :, :].mean(axis=0)
     elif np.ndim(ds[plotVar]) == 4:
@@ -2173,6 +2083,11 @@ def plotlatlon(ds,
             pData = (
                 ds[plotVar].values[tSteps, jPlev, :, :].mean(axis=0) -
                 diffDs[diffVar].values[diffTSteps, kPlev, :, :].mean(axis=0))
+            if diffAsPct_flag:
+                pData = (
+                    pData /
+                    diffDs[diffVar].values[diffTSteps, kPlev, :, :].mean(axis=0)
+                    )
         else:
             pData = ds[plotVar].values[tSteps, jPlev, :, :].mean(axis=0)
 
@@ -2312,7 +2227,190 @@ def plotlatlon(ds,
 
         if qc_flag:
             print(regMean)
+    
+    return (pData, uData, vData)
 
+
+def plotlatlon(ds,
+               plotVar,
+               box_flag=False,
+               boxLat=np.array([-20, 20]),
+               boxLon=np.array([210, 260]),
+               caseString=None,
+               cbar_flag=True,
+               cbar_dy=-0.1,
+               cbar_height=0.02,
+               cMap=None,
+               compcont=None,
+               compcont_flag=True,
+               convertUnits_flag=True,
+               diff_flag=False,
+               diffAsPct_flag=False,
+               diffDs=None,
+               diffPlev=None,
+               diffTSteps=None,
+               diffVar=None,
+               fontSize=12,
+               figDims=None,
+               latLim=np.array([-30, 30]),
+               latlbls=None,
+               levels=None,
+               lineCont_flag=False,
+               lineContDiff_flag=False,
+               lineContDiffAsPct_flag=False,
+               lineContLevels=None,
+               lineContVar=None,
+               lineContDiffVar=None,
+               lineContUseDiffDs_flag=False,
+               lonLim=np.array([119.5, 270.5]),
+               lonlbls=None,
+               makeFigure_flag=True,
+               newUnits=None,
+               ocnOnly_flag=False,
+               plev=None,
+               qc_flag=False,
+               quiver_flag=False,
+               quiverDs=None,
+               quiverDiffDs=None,
+               quiverKey_flag=True,
+               quiverNorm_flag=False,
+               quiverScale=0.4,
+               quiverScaleVar=None,
+               quiverUnits='inches',
+               returnM_flag=True,  # MUST be true for now (bug)
+               rmRegLatLim=None,
+               rmRegLonLim=None,
+               rmRegMean_flag=False,
+               rmse_flag=False,
+               save_flag=False,
+               saveDir=None,
+               stampDate_flag=True,
+               subSamp=None,
+               tSteps=None,
+               tStepLabel_flag=True,
+               useDiffDs_flag=False,
+               uRef=0.1,
+               uVar='TAUX',
+               vVar='TAUY',
+               verbose_flag=False,
+               **kwargs
+               ):
+    """
+    Plot a map of a given dataset averaged over the specified timesteps
+
+    Version Date:
+        2018-03-13
+    """
+
+    # Set lats/lons to label if not provided
+    if latlbls is None:
+        latlbls = mwp.getlatlbls(latLim)
+    if lonlbls is None:
+        lonlbls = mwp.getlonlbls(lonLim)
+
+    # Get levels for contouring if not provided
+    if levels is None:
+        if diffAsPct_flag:
+            levels = np.arange(-1, 1.001, 0.1)
+        else:
+            levels = getmapcontlevels(
+                (plotVar  # +
+                 # (plev if np.ndim(ds[plotVar]) == 4
+                 #  else '')
+                 ),
+                diff_flag=any([diff_flag,
+                               rmRegMean_flag])
+                )
+
+    if compcont is None:
+        compcont = getcompcont(plotVar,
+                               diff_flag=any([diff_flag,
+                                              rmRegMean_flag])
+                               )
+
+    # Find colormap for means
+    if cMap is None:
+        cMap = mwp.getcmap(plotVar,
+                           diff_flag=any([diff_flag,
+                                          rmRegMean_flag])
+                           )
+
+    # Determine time steps for plotting
+    if tSteps is None:
+        tSteps = np.arange(0, ds[plotVar].shape[0], dtype=int)
+    if diffTSteps is None:
+        diffTSteps = tSteps
+    if verbose_flag:
+        print(tSteps)
+        if diff_flag:
+            print(diffTSteps)
+
+    # Determine differencing pressure level if not provided
+    if diffPlev is None:
+        diffPlev = plev
+
+    # Set caseString for plotting
+    if caseString is None:
+        if any([diff_flag, useDiffDs_flag]):
+            caseString = ds.id + '-' + diffDs.id
+        else:
+            caseString = ds.id
+
+    # Ensure diffVar is defined as non-None
+    if diffVar is None:
+        diffVar = plotVar
+
+    # Define quiver datasets if needed
+    if quiverDs is None:
+        quiverDs = ds
+    if quiverDiffDs is None:
+        quiverDiffDs = diffDs
+
+    # Convert units as needed
+    (ds[plotVar].values,
+     ds[plotVar].attrs['units']) = mwfn.convertunit(
+        ds[plotVar].values,
+        ds[plotVar].units,
+        mwfn.getstandardunits(plotVar)
+        )
+    if diff_flag:
+        try:
+            (diffDs[diffVar].values,
+             diffDs[diffVar].attrs['units']) = mwfn.convertunit(
+                diffDs[diffVar].values,
+                diffDs[diffVar].units,
+                mwfn.getstandardunits(diffVar)
+                )
+        except TypeError:
+            pass
+
+    # Pull data for plotting color contours
+    (pData, uData, vData) = getlatlonpdata((diffDs
+                                            if useDiffDs_flag
+                                            else ds),
+                                           plotVar,
+                                           tSteps,
+                                           diff_flag=diff_flag,
+                                           diffAsPct_flag=diffAsPct_flag,
+                                           diffDs=diffDs,
+                                           diffPlev=diffPlev,
+                                           diffTSteps=diffTSteps,
+                                           diffVar=diffVar,
+                                           ocnOnly_flag=ocnOnly_flag,
+                                           plev=plev,
+                                           qc_flag=qc_flag,
+                                           quiver_flag=quiver_flag,
+                                           quiverDs=quiverDs,
+                                           quiverDiffDs=quiverDiffDs,
+                                           quiverNorm_flag=quiverNorm_flag,
+                                           quiverScaleVar=quiverScaleVar,
+                                           rmRegMean_flag=rmRegMean_flag,
+                                           rmRegLatLim=rmRegLatLim,
+                                           rmRegLonLim=rmRegLonLim,
+                                           uVar=uVar,
+                                           vVar=vVar,
+                                           )
+    
     # Set variables to only extend one end of colorbar
     maxExtendVars = ['PRECT', 'PRECC', 'PRECL', 'precip', 'U10']
 
@@ -2391,7 +2489,65 @@ def plotlatlon(ds,
                                 tStepLabel_flag=False,
                                 **kwargs
                                 )
+    
+    # Add overlayed line contours
+    if lineCont_flag:
+        
+        if lineContVar is None:
+            lineContVar = plotVar
+        if lineContDiffVar is None:
+            lineContDiffVar = diffVar
+        if lineContUseDiffDs_flag is True:
+            lineContDs = diffDs
+        else:
+            lineContDs = ds
 
+        # Get levels for contouring if not provided
+        if lineContLevels is None:
+            if lineContDiffAsPct_flag:
+                lineContLevels = np.arange(-1, 1.001, 0.1)
+            else:
+                lineContLevels = getmapcontlevels(
+                    (lineContVar  # +
+                     # (plev if np.ndim(ds[plotVar]) == 4
+                     #  else '')
+                     ),
+                    diff_flag=any([lineContDiff_flag,
+                                   rmRegMean_flag])
+                    )[::2]
+        
+        if lineContDiff_flag:
+            if diffDs is None:
+                raise TypeError('diffDs is None...')
+        
+        lineContData, _, _ = getlatlonpdata(lineContDs,
+                                            lineContVar,
+                                            tSteps,
+                                            diff_flag=lineContDiff_flag,
+                                            diffAsPct_flag=lineContDiffAsPct_flag,
+                                            diffDs=diffDs,
+                                            diffPlev=diffPlev,
+                                            diffTSteps=diffTSteps,
+                                            diffVar=lineContDiffVar,
+                                            ocnOnly_flag=ocnOnly_flag,
+                                            plev=plev,
+                                            rmRegMean_flag=rmRegMean_flag,
+                                            rmRegLatLim=rmRegLatLim,
+                                            rmRegLonLim=rmRegLonLim,
+                                            )
+        
+        # Create lat/lon meshed grids
+        lonG, latG = np.meshgrid(ds.lon, ds.lat)
+        
+        CS = hMap.contour(lonG, latG,
+                     lineContData,
+                     levels=lineContLevels,
+                     # extend=False,
+                     latlon=True,
+                     colors='k'
+                     )
+        plt.clabel(CS, fontsize=9, inline=1)
+        
     # Add removed regional mean to annotations
     if rmRegMean_flag:
         if diff_flag:
@@ -2491,6 +2647,7 @@ def plotmultilatlon(dsDict,
                     cbarOrientation='vertical',
                     compcont_flag=True,
                     diff_flag=False,
+                    diffAsPct_flag=False,
                     diffIdList=None,
                     diffDs=None,
                     diffPlev=None,
@@ -2748,6 +2905,7 @@ def plotmultilatlon(dsDict,
                 cbar_flag=False,
                 compcont_flag=compcont_flag,
                 diff_flag=diff_flag,
+                diffAsPct_flag=diffAsPct_flag,
                 diffDs=(dsDict[diffIdList[jSet]]
                         if any([diffDs is None,
                                 diffDs == dsDict])
@@ -2810,6 +2968,10 @@ def plotmultilatlon(dsDict,
                     cbar_flag=False,
                     compcont_flag=compcont_flag,
                     diff_flag=False,
+                    diffDs=(dsDict[diffIdList[jSet]]
+                        if any([diffDs is None,
+                                diffDs == dsDict])
+                        else diffDs),
                     fontSize=fontSize,
                     latLim=latLim,
                     latlbls=latlbls,

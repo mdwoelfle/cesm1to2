@@ -165,7 +165,7 @@ def calcregmeanindex(ds,
                                             precipVar=indexVar,
                                             qc_flag=qc_flag)
 
-    elif indexName.lower() in ['sepacsst', 'sepsst']:
+    elif indexName.lower() in ['sepacsst', 'sepsst', 'sepsst_raw']:
         # Assign default index if none provided
         if indexType is None:
             indexType = 'tropicalRelative'
@@ -174,7 +174,7 @@ def calcregmeanindex(ds,
         
         # Compute southeast Pacific SST metric
         indexDa = mwfn.calcdssepsstindex(ds,
-                                         indexType=indexType,
+                                         indexType=('raw' if 'raw' in indexName.lower() else indexType),
                                          indexVar=indexVar,
                                          ocnOnly_flag=ocnOnly_flag,
                                          )
@@ -1386,7 +1386,7 @@ def plotmetricvsversion(indexName,
     
     Available indices:
         'dITCZ', 'PAI', 'pcent', 'dpdy_epac', dsstdy_epac', 'fnsasym',
-        'sepsst'
+        'sepsst', 'sepsst_raw', 'walker'
     """
 
     # Set default plot values
@@ -1396,7 +1396,7 @@ def plotmetricvsversion(indexName,
     if versionIds is None:
         versionIds = list(ds.keys())
     
-    if indexName in ['dITCZ']:
+    if indexName.lower() in ['ditcz']:
         if plotVar is None:
             plotVar = 'PRECT'
         if obsVar is None:
@@ -1474,19 +1474,38 @@ def plotmetricvsversion(indexName,
             yLim_periodMean = np.array([-10, 10])
         if yLim_seasCyc is None:
             yLim_seasCyc = np.array([-10, 10])
-    elif indexName.lower() in ['sepacsst', 'sepsst']:
+    elif indexName.lower() in ['sepacsst', 'sepsst', 'sepsst_raw']:
         if plotVar is None:
             plotVar = 'TS'
         if obsVar is None:
             obsVar = ('sst' if 'sst' in obsDs else 'SST')
         ocnOnly_flag = True
-        title = 'SE Pac. SST index'
+        if '_raw' in indexName.lower():
+            indexName = indexName[:-4]
+            indexType = 'raw'
+        if indexType == 'raw':
+            title = 'SE Pac. SST'
+        else:
+            title = 'SE Pac. SST index'
         if yLim_annMean is None:
             yLim_annMean = None
         if yLim_periodMean is None:
             yLim_periodMean = None
         if yLim_seasCyc is None:
             yLim_seasCyc = None
+    elif indexName.lower() in ['walker']:
+        if plotVar is None:
+            plotVar = 'PSL'
+        if obsVar is None:
+            obsVar = ('sp' if 'sp' in obsDs else 'PSL')
+        ocnOnly_flag = True
+        title = 'dP/dx (Walker)'
+        if yLim_annMean is None:
+            yLim_annMean = None  # np.array([-1, 0])
+        if yLim_periodMean is None:
+            yLim_periodMean = None  # np.array([-1, 1])
+        if yLim_seasCyc is None:
+            yLim = None  # np.array([-1.5, 1.5])
 
     # Create dictionary to hold mean values
     annMean = dict()

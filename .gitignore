@@ -12,6 +12,7 @@ temp/
 mdwtools/
 mdwtools
 .ipynb_checkpoints/
+.ipynb_checkpoints
 
 # Random files to ignore (no idea where it came from)
 core

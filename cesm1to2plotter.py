@@ -207,7 +207,7 @@ def getavailableyearslist(versionId):
     """
     Get list of averaging periods available for a given model version
     """
-    return {'01': None,
+    return {'01': ['0.9x1.25'],
             '28': ['2-10', '2-20', '50-74', '75-99'],
             '36': ['2-10', '2-20', '21-40', '60-60', '75-99'],
             'ga7.66': ['2-20', '20-39', '55-74'],
@@ -252,6 +252,7 @@ def getcasebase(versionId=None,
                     '119f_ice': 'f.2000_DEV.f09_f09.pd_ice.119',
                     '119f_liqss': 'f.2000_DEV.f09_f09.pd_liqss.119',
                     '119f_microp': 'f.2000_DEV.f09_f09.pd_microp.119',
+                    '119f_nocwv': 'f.2000_DEV.f09_f09.pd_pra.119',
                     '119f_pra': 'f.2000_DEV.f09_f09.pd_pra.119',
                     '125': 'b.e20.B1850.f09_g16.pi_control.all.125',
                     '125f': 'f.2000_DEV.f09_f09.pd_control.125',
@@ -259,6 +260,7 @@ def getcasebase(versionId=None,
                     '194': 'b.e20.B1850.f09_g17.pi_control.all.194',
                     '195': 'b.e20.B1850.f09_g17.pi_control.all.195',
                     '297': 'b.e20.B1850.f09_g17.pi_control.all.297',
+                    '297_nocwv': 'b.1850.f09_g17.pi_unimicro.297',
                     '297f': 'f.2000.f09_f09.pd_control.cesm20',
                     '297f_microp': 'f.2000.f09_f09.pd_microp.cesm20',
                     '297f_pra': 'f.2000.f09_f09.pd_pra.cesm20',
@@ -346,6 +348,7 @@ def getcolordict():
             '119f_ice': '#9467bd',
             '119f_liqss': '#9467bd',
             '119f_microp': '#9467bd',
+            '119f_nocwv': '#9467bd',
             '119f_pra': '#9467bd',
             '125': '#8c564b',
             '125f': '#8c564b',
@@ -353,6 +356,7 @@ def getcolordict():
             '194': '#7f7f7f',
             '195': '#bcbd22',
             '297': '#42d1f4',
+            '297_nocwv': '#42d1f4',
             '297f': '#42d1f4',
             '297f_microp': '#42d1f4',
             '297f_pra': '#42d1f4',
@@ -412,7 +416,8 @@ def getloadfilelists(versionIds,
         
         # Set info for runs by me
         woelfleCases = ['119f', '119f_gamma', '119f_ice', '119f_liqss',
-                        '119f_microp', '119f_pra', '125f',
+                        '119f_microp', '119f_nocwv', '119f_pra', '125f',
+                        '297_nocwv',
                         '297f', '297f_microp', '297f_pra', '297f_sp',
                         'cesm20f', 'cesm20f_microp', 'cesm20f_pra', 'cesm20f_sp']
         woelfleClimoDir = '/gpfs/fs1/work/woelfle/cesm1to2/climos/'
@@ -451,6 +456,7 @@ def getloadfilelists(versionIds,
                 # Ensure climos exist
                 if all([not os.path.isfile(loadFileLists[vid][0]), climo_flag]):
                     print('Cannot find climo for {:s} loading raw output files instead.'.format(vid))
+                    print(loadFileLists[vid][0])
                     loadFileLists[vid] = [
                         woelfleRawDir + 
                         fileBaseDict[vid] + '/' +
@@ -502,6 +508,7 @@ def getmarkerdict():
             '119f_ice': '*',
             '119f_liqss': 'd',
             '119f_microp': 'v',
+            '119f_nocwv': '<',
             '119f_pra': '<',
             '125': 'o',
             '125f': 's',
@@ -509,6 +516,7 @@ def getmarkerdict():
             '194': 'o',
             '195': 'o',
             '297': 'o',
+            '297_nocwv': '<',
             '297f': 's',
             '297f_microp': 'v',
             '297f_pra': '<',
@@ -565,7 +573,7 @@ def getmapcontlevels(plotVar,
                       'PSL': np.arange(-4, 4.01, 0.5),
                       'RELHUM': np.arange(-10, 10.1, 1),
                       'SHFLX': np.arange(-10, 10.1, 1.),
-                      'SWCF': np.arange(-30, 30.1, 3),
+                      'SWCF': np.arange(-50, 50.1, 5),
                       'T': np.arange(-2, 2.1, 0.2),
                       'TAUX': np.arange(-0.1, 0.101, 0.01),
                       'TAUY': np.arange(-0.1, 0.101, 0.01),
@@ -956,7 +964,19 @@ def loadobsdatasets(obsList=None,
 
     # Load CERES-EBAF
     if ceresEbaf_flag:
-        raise NotImplementedError('CERES-EBAF not set to load yet.')
+        if gethostname() in getuwmachlist():
+            raise NotImplementedError('CERES-EBAF not set to load yet.')
+        elif gethostname()[0:6] in getncarmachlist(6):
+            ceresDir = '/gpfs/p/cesm/amwg/amwg_data/obs_data/'
+            ceresClimoFiles = [ceresDir + 
+                               'CERES-EBAF_{:02d}_climo.nc'.format(mon + 1)
+                               for mon in range(12)]
+
+            # Load CERES for climo only (as this is all I can find easily)
+            obsDsDict['ceresClimo'] = xr.open_mfdataset(ceresClimoFiles,
+                                                        decode_times=False)
+            obsDsDict['ceresClimo'].attrs['id'] = 'CERES_climo'
+            obsDsDict['ceresClimo'].attrs['climo_yrs'] = '2000-2013'
 
     # Load ERA-I
     if erai_flag:
@@ -1130,6 +1150,7 @@ def plotbiasrelation(ds,
                      legend_flag=True,
                      makeFigure_flag=False,
                      obsDsDict=None,
+                     obsVarDict=None,
                      plotObs_flag=True,
                      splitTSteps_flag=False,
                      tSteps=None,
@@ -1184,6 +1205,8 @@ def plotbiasrelation(ds,
                   'dpdy_epac': 'epac',
                   'dslp': 'DiNezioetal2013',
                   'dsstdy_epac': 'epac',
+                  'sepsst': None,
+                  'sepsst_raw': 'raw',
                   'walker': 'testing'}
     if xIndexType is None:
         xIndexType = indexTypes[xIndex.lower()]
@@ -1195,6 +1218,8 @@ def plotbiasrelation(ds,
                  'dpdy_epac': 'PS',
                  'dslp': 'PSL',
                  'dsstdy_epac': 'TS',
+                 'sepsst': 'TS',
+                 'sepsst_raw': 'TS',
                  'walker': 'PS'}
     labelDict = {'cpacshear': 'Central Pacific Wind Shear' +
                               ' (850-200 hPa; {:s})'.format(
@@ -1204,19 +1229,23 @@ def plotbiasrelation(ds,
                  'dpdy_epac': 'E. Pac. Meridional SST gradient (hPa)',
                  'dslp': 'SLP Gradient (hPa)',
                  'dsstdy_epac': 'E. Pac. Meridional SST gradient (K)',
+                 'sepsst': 'SEP SST Index (K)',
+                 'sepsst_raw': 'SEP SST (K)',
                  'walker': 'Walker Circulation Index (hPa)'}
     if plotObs_flag:
         #        obsDsDict = {'cpacshear': obsDsDict['cpacshear'],
         #                   'cti': obsDsDict['cti'],
         #                   'ditcz': obsDsDict['ditcz'],
         #                   'walker': obsDsDict['walker']}
-        obsVars = {'cpacshear': 'u',
-                   'cti': 'sst',
-                   'ditcz': 'precip',
-                   'dpdy_epac': 'sp',
-                   'dslp': 'msl',
-                   'dsstdy_epac': 'sst',
-                   'walker': 'sp'}
+        if obsVarDict is None:
+            obsVarDict = {'cpacshear': 'u',
+                          'cti': 'sst',
+                          'ditcz': 'precip',
+                          'dpdy_epac': 'sp',
+                          'dslp': 'msl',
+                          'dsstdy_epac': 'sst',
+                          'sepsst': 'sst',
+                          'walker': 'sp'}
 
     # Compute indices for various model versions
     for vid in versionIds:
@@ -1247,7 +1276,7 @@ def plotbiasrelation(ds,
             obsDsDict[xIndex.lower()],
             xIndex,
             indexType=indexTypes[xIndex.lower()],
-            indexVar=obsVars[xIndex.lower()],
+            indexVar=obsVarDict[xIndex.lower()],
             ocnOnly_flag=False)
         try:
             xMean['obs'] = xObsDa[xTSteps].mean(dim='time')
@@ -1260,7 +1289,7 @@ def plotbiasrelation(ds,
             obsDsDict[yIndex.lower()],
             yIndex,
             indexType=indexTypes[yIndex.lower()],
-            indexVar=obsVars[yIndex.lower()],
+            indexVar=obsVarDict[yIndex.lower()],
             ocnOnly_flag=False)
         try:
             yMean['obs'] = yObsDa[yTSteps].mean(dim='time')
@@ -1396,6 +1425,19 @@ def plotmetricvsversion(indexName,
     if versionIds is None:
         versionIds = list(ds.keys())
     
+    if indexName.lower() in ['cti', 'coldtongueindex']:
+        if plotVar is None:
+            plotVar = 'TS'
+        if obsVar is None:
+            obsVar = ('sst' if 'sst' in obsDs else 'SST')
+        ocnOnly_flag = True
+        title = 'CTI'
+        if yLim_annMean is None:
+            yLim_annMean = np.array([-1, 0.5])
+        if yLim_periodMean is None:
+            yLim_periodMean = np.array([-1, 0.5])
+        if yLim_seasCyc is None:
+            yLim_seasCyc = np.array([-1.75, 0.75])
     if indexName.lower() in ['ditcz']:
         if plotVar is None:
             plotVar = 'PRECT'
@@ -1609,12 +1651,16 @@ def plotmetricvsversion(indexName,
         plt.xticks(np.arange(1, 13))
         plt.xlabel('Month')
 
-        plt.ylabel('{:s}'.format(title) +
-                   (' ({:s})'.format(indexDa.units)
-                    if indexDa.units is not None
-                    else '') +
-                   ('\n[Annual mean removed]' if rmAnnMean_flag else '')
-                   )
+        try:
+            plt.ylabel('{:s}'.format(title) +
+                       (' ({:s})'.format(indexDa.units)
+                        if indexDa.units is not None
+                        else '') +
+                       ('\n[Annual mean removed]' if rmAnnMean_flag else '')
+                       )
+        except AttributeError as err:
+            print(indexDa)
+            raise AttributeError(err)
         try:
             plt.ylim(yLim_seasCyc)
         except NameError:
@@ -2855,7 +2901,44 @@ def plotmultilatlon(dsDict,
             cbColInd = 2
             cbRowInd = 0
             cbar_xoffset = -0.02
+    
+            # Set gridspec colorbar location
+            cbColInd = 3
+            cbRowInd = 0
+            cbar_xoffset = -0.01
+    elif len(plotIdList) == 8:
+        if cbarOrientation == 'vertical':
+            # Set figure window size
+            if figSize is None:
+                if np.diff(latLim) >= 50:
+                    hf.set_size_inches(10, 6.5, forward=True)
+                else:
+                    hf.set_size_inches(10, 6.5, forward=True)
+            else:
+                hf.set_size_inches(figSize[0], figSize[1],
+                                   forward=True)
 
+            # Set up subplots
+            gs = gridspec.GridSpec(4, 3,
+                                   height_ratios=[1, 1, 1, 1],
+                                   hspace=0.05,
+                                   width_ratios=[30, 30, 1],
+                                   wspace=0.2,
+                                   left=0.04,
+                                   right=0.96,
+                                   bottom=0.00,
+                                   top=1.0,
+                                   )
+
+            # Set gridspec colorbar location
+            cbColInd = 2
+            cbRowInd = 0
+            cbar_xoffset = -0.01
+            
+        # Set gridspec index order
+        colInds = [0, 1, 0, 1, 0, 1, 0, 1]
+        rowInds = [0, 0, 1, 1, 2, 2, 3, 3]
+            
     elif len(plotIdList) == 9:
         if cbarOrientation == 'vertical':
             # Set figure window size
@@ -2987,10 +3070,12 @@ def plotmultilatlon(dsDict,
                     cbar_flag=False,
                     compcont_flag=compcont_flag,
                     diff_flag=False,
-                    diffDs=(dsDict[diffIdList[jSet]]
-                        if any([diffDs is None,
+                    diffDs=(
+                        (dsDict[diffIdList[jSet]]
+                         if any([diffDs is None,
                                 diffDs == dsDict])
-                        else diffDs),
+                         else diffDs)
+                        if diff_flag else None),
                     fontSize=fontSize,
                     latLim=latLim,
                     latlbls=latlbls,
@@ -4664,5 +4749,3 @@ def setfilepaths(loadClimo_flag=True,
         saveDir = '/glade/work/woelfle/figs/cesm1to2/'
 
     return (ncDir, ncSubDir, saveDir)
-
-# %%Do other stuff

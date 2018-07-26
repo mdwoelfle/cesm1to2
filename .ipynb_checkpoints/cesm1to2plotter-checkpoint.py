@@ -42,7 +42,7 @@ import multiprocessing as mp     # Allow use of multiple cores
 # from mpl_toolkits.basemap import Basemap  # import tool for lat/lon plotting
 # from matplotlib import cm  # import access to colormaps
 
-# from scipy import interpolate    # import interpolation functions from scipy
+from scipy import interpolate    # import interpolation functions from scipy
 
 # import multiprocessing as mp  # Allow use of multiple cores
 
@@ -369,9 +369,10 @@ def getcolordict():
             }
 
 def getloadfilelists(versionIds,
-                     loadSuffixes,
+                     loadSuffixes=None,
                      climo_flag=True,
                      fileBaseDict=None,
+                     ncSubDir=None,
                      nyrs=1,
                      yr0=2,
                      ):
@@ -426,10 +427,18 @@ def getloadfilelists(versionIds,
         woelfleRawSubDir = 'atm/hist/'
 
         for vid in versionIds:
+            # Determine ncSubDir
+            try:
+                ncLoadSubDir = ncSubDir[vid]
+            except TypeError:
+                ncLoadSubDir = ncSubDir
             if vid in cecileCases:
                 loadFileLists[vid] = [cecileDir + 
                                       fileBaseDict[vid] + '/' +
-                                      cecileSubDir +
+                                      (cecileSubDir
+                                       if ((ncLoadSubDir is None) or
+                                           (ncLoadSubDir == ''))
+                                       else ncLoadSubDir) +
                                       fileBaseDict[vid] +
                                       loadSuffix
                                       for loadSuffix in getloadsuffix(vid,
@@ -437,15 +446,23 @@ def getloadfilelists(versionIds,
             elif vid in releaseCases:
                 loadFileLists[vid] = [(releaseClimoDir if climo_flag else releaseDir) + 
                                       fileBaseDict[vid] + '/' +
-                                      (releaseClimoSubDir if climo_flag else releaseSubDir) +
+                                      ((releaseClimoSubDir if climo_flag else releaseSubDir)
+                                       if ((ncLoadSubDir is None) or
+                                           (ncLoadSubDir == ''))
+                                       else ncLoadSubDir) +
                                       fileBaseDict[vid] +
                                       loadSuffix
                                       for loadSuffix in getloadsuffix(vid,
-                                                                      climo_flag=climo_flag)]
+                                                                      climo_flag=climo_flag,
+                                                                      nyrs=nyrs,
+                                                                      yr0=yr0)]
             else:
                 loadFileLists[vid] = [(woelfleClimoDir if climo_flag else woelfleRawDir) + 
                                       fileBaseDict[vid] + '/' +
-                                      (woelfleClimoSubDir if climo_flag else woelfleRawSubDir) +
+                                      ((woelfleClimoSubDir if climo_flag else woelfleRawSubDir)
+                                       if ((ncLoadSubDir is None) or
+                                           (ncLoadSubDir == ''))
+                                       else ncLoadSubDir) +
                                       fileBaseDict[vid] +
                                       loadSuffix
                                       for loadSuffix in getloadsuffix(vid,
@@ -484,8 +501,8 @@ def getloadsuffix(vid,
                   if climo_flag
                   else ['.cam.h0.' + '{:04d}'.format(yr + yr0) +
                         '-{:02d}'.format(mon+1) + '.nc'
-                        for mon in range(12)
                         for yr in range(nyrs)
+                        for mon in range(12)
                         ]
                   )
     
@@ -562,7 +579,7 @@ def getmapcontlevels(plotVar,
                       'LHFLX': np.arange(-50, 50.1, 5),
                       'LWCF': np.arange(-20, 20.1, 2),
                       # 'OMEGA': np.arange(-0.12, 0.12001, 0.01),
-                      'OMEGA': np.arange(-0.01, 0.01001, 0.001),
+                      'OMEGA': np.arange(-0.125, 0.1251, 0.0125),
                       'OMEGA500': np.arange(-0.125, 0.1251, 0.0125),
                       'OMEGA850': np.arange(-0.125, 0.1251, 0.0125),
                       'PBLH': np.arange(-150, 150.1, 15),
@@ -602,7 +619,7 @@ def getmapcontlevels(plotVar,
     else:
         try:
             levels = {'CLDHGH': np.arange(0, 0.51, 0.025),
-                      'CLDLOW': np.arange(0, 0.51, 0.025),
+                      'CLDLOW': np.arange(0, 1.01, 0.1),
                       'CLDMED': np.arange(0, 0.51, 0.025),
                       'CLDTOT': np.arange(0, 0.51, 0.025),
                       'CLOUD': np.arange(0, 0.51, 0.025),
@@ -849,7 +866,9 @@ def loadmodelruns(versionIds,
 
     # Set file paths if not provided
     if ncDir is None:
-        ncDir, ncSubDir, _ = setfilepaths()
+        ncDir = setfilepaths()[0]
+    if ncSubDir is None:
+        ncSubDir = setfilepaths()[1]
 
     # Set which variables to compute in addition to history variables
     if computeAll2DVars_flag:
@@ -875,19 +894,38 @@ def loadmodelruns(versionIds,
 
     # Create list of files to load
     if newRuns_flag:
-        loadFileLists = {versionIds[j]: [ncDir + fileBaseDict[versionIds[j]] +
-                                         '/' +
-                                         ncSubDir +
-                                         fileBaseDict[versionIds[j]] +
-                                         loadSuffix
-                                         for loadSuffix in loadSuffixes]
-                         for j in range(len(versionIds))}
+        try:
+            # Attempt to load using a common ncSubDir
+            #   which will fail if ncSubDir is a dict
+            loadFileLists = {vid: [ncDir + fileBaseDict[vid] +
+                                   '/' +
+                                   ncSubDir +
+                                   fileBaseDict[vid] +
+                                   loadSuffix
+                                   for loadSuffix in loadSuffixes]
+                             for vid in versionIds}
+        except TypeError:
+            # Attempt to load using a ncSubDir specific to each case
+            #   which will fail if ncSubDir is a dict
+            loadFileLists = {vid: [ncDir + fileBaseDict[vid] +
+                                   '/' +
+                                   ncSubDir[vid] +
+                                   fileBaseDict[vid] +
+                                   loadSuffix
+                                   for loadSuffix in loadSuffixes]
+                             for vid in versionIds}
     else:
         loadFileLists = getloadfilelists(versionIds,
-                                         loadSuffixes,
-                                         climo_flag=loadClimo_flag)
+                                         loadSuffixes=loadSuffixes,
+                                         climo_flag=loadClimo_flag,
+                                         ncSubDir=(ncSubDir
+                                                   if ncSubDir is not None
+                                                   else None),
+                                         )
 
     # Open netcdf file(s)
+    for vid in versionIds:
+        print(loadFileLists[vid][0])
     dataSets = {versionId: xr.open_mfdataset(loadFileLists[versionId],
                                              decode_times=False)
                 for versionId in versionIds}
@@ -940,9 +978,11 @@ def loadobsdatasets(obsList=None,
                     ceresEbaf_flag=False,
                     erai_flag=False,
                     gpcp_flag=False,
+                    gpcpYrs=[1979, 2009],
                     hadIsst_flag=False,
                     hadIsstYrs=[1979, 2010],
                     whichHad='all',
+                    whichGpcp='all',
                     ):
     """
     Load observational datasets for comparison with simulations
@@ -1032,16 +1072,65 @@ def loadobsdatasets(obsList=None,
             obsDsDict['gpcpClimo'] = xr.open_dataset(gpcpDir + gpcpClimoFile)
             obsDsDict['gpcpClimo'].attrs['id'] = 'GPCP_climo'
         elif gethostname()[0:6] in getncarmachlist(6):
-            gpcpDir = '/gpfs/p/cesm/amwg/amwg_data/obs_data/'
-            gpcpClimoFiles = [gpcpDir + 
-                              'GPCP_{:02d}_climo.nc'.format(mon + 1)
-                              for mon in range(12)]
+            # Pull climo files only
+            if whichGpcp in ['climo']:
+                gpcpDir = '/gpfs/p/cesm/amwg/amwg_data/obs_data/'
+                gpcpClimoFiles = [gpcpDir + 
+                                  'GPCP_{:02d}_climo.nc'.format(mon + 1)
+                                  for mon in range(12)]
+
+                # Load GPCP for climo only (as this is all I can find easily)
+                obsDsDict['gpcpClimo'] = xr.open_mfdataset(gpcpClimoFiles,
+                                                           decode_times=False)
+                obsDsDict['gpcpClimo'].attrs['id'] = 'GPCP_climo'
+                obsDsDict['gpcpClimo'].attrs['climo_yrs'] = '1979-2009'
             
-            # Load GPCP for climo only (as this is all I can find easily)
-            obsDsDict['gpcpClimo'] = xr.open_mfdataset(gpcpClimoFiles,
-                                                       decode_times=False)
-            obsDsDict['gpcpClimo'].attrs['id'] = 'GPCP_climo'
-            obsDsDict['gpcpClimo'].attrs['climo_yrs'] = '1979-2009'
+            # Pull monthly files
+            elif whichGpcp in ['all']:
+                # Load monthly GPCP
+                gpcpDir = '/gpfs/fs1/collections/rda/data/ds728.4/netcdf/'
+                gpcpFiles = [gpcpDir + 
+                             'gpcp_cdr_v23rB1_y{:4d}_m{:02d}.nc'.format(yr, mon + 1)
+                             for yr in np.arange(gpcpYrs[0], gpcpYrs[1] + 1)
+                             for mon in range(12)]
+                obsDsDict['gpcp'] = xr.open_mfdataset(gpcpFiles,
+                                                      decode_times=False)
+                
+                # Rename latitude and longitude to match CESM conventions
+                obsDsDict['gpcp'].rename({'latitude': 'lat',
+                                          'longitude': 'lon'},
+                                         inplace=True)
+                
+                # Set dimensions to be lat and lon instead of nlat and nlon
+                obsDsDict['gpcp'].swap_dims({'nlat': 'lat', 'nlon': 'lon'}, inplace=True)
+                
+                # Compute climatology for GPCP
+                nmon = obsDsDict['gpcp']['precip'].shape[0]
+                gpcpClimo = np.zeros([12,
+                                      obsDsDict['gpcp']['precip'].shape[1],
+                                      obsDsDict['gpcp']['precip'].shape[2]])
+                for mon in range(12):
+                    gpcpClimo[mon, :, :] = (
+                        obsDsDict['gpcp']['precip'][np.arange(mon, nmon, 12),
+                                                    :, :].mean(axis=0))
+                if True:
+                    # Create dataArray for climatology
+                    # Construct climatological data array
+                    obsDa = xr.DataArray(
+                        gpcpClimo,
+                        attrs=obsDsDict['gpcp']['precip'].attrs,
+                        coords={'time': obsDsDict['gpcp']['precip'].coords['time'][0:12],
+                                'lat': obsDsDict['gpcp']['precip'].coords['lat'],
+                                'lon': obsDsDict['gpcp']['precip'].coords['lon']},
+                        dims=obsDsDict['gpcp']['precip'].dims,
+                        )
+                    # Transform to dataset for consistency
+                    obsDsDict['gpcpClimo'] = xr.Dataset(
+                        data_vars={'precip': obsDa})
+                    obsDsDict['gpcpClimo'].attrs['climo_yrs'] = (
+                        '{:4d}-{:4d}'.format(gpcpYrs[0], gpcpYrs[1]))
+                    obsDsDict['gpcpClimo'].attrs['id'] = 'GPCP_climo'
+
 
     # Load HadISST
     if hadIsst_flag:
@@ -1121,7 +1210,7 @@ def loadobsdatasets(obsList=None,
                 nmon = hadIsstDs_sub['SST'].values.shape[0]
                 for mon in range(12):
                     hadClimo[mon, :, :] = hadIsstDs_sub['SST'].values[
-                        np.arange(mon, nmon, 12)].mean(axis=0)
+                        np.arange(mon, nmon, 12), :, :].mean(axis=0)
 
                 # Construct climatological data array
                 obsDa = xr.DataArray(
@@ -2130,13 +2219,27 @@ def getlatlonpdata(ds,
     # Pull data for plotting color contours
     if np.ndim(ds[plotVar]) == 3:
         if diff_flag:
-            pData = (ds[plotVar].values[tSteps, :, :].mean(axis=0) -
-                     diffDs[diffVar].values[diffTSteps, :, :].mean(axis=0))
+            diffPData = diffDs[diffVar].values[diffTSteps, :, :].mean(axis=0)
+            pData = ds[plotVar].values[tSteps, :, :].mean(axis=0)
+            try:
+                pData = pData - diffPData
+            except ValueError:
+                # regrid pDataRef to pDataNew's grid
+                print('Regridding diffPData to pData''s grid')
+                diffPData = interpolate.interp2d(
+                    diffDs[diffVar].lon,
+                    diffDs[diffVar].lat,
+                    diffPData,
+                    kind='linear',
+                    copy=True,
+                    bounds_error=False,
+                    fill_value=np.nan)(ds[plotVar].lon, ds[plotVar].lat)
+
+                pData = pData - diffPData
+
+            # Compute fractional difference if requested
             if diffAsPct_flag:
-                pData = (
-                    pData /
-                    diffDs[diffVar].values[diffTSteps, :, :].mean(axis=0)
-                    )
+                pData = pData / diffPData
         else:
             pData = ds[plotVar].values[tSteps, :, :].mean(axis=0)
     elif np.ndim(ds[plotVar]) == 4:
@@ -2315,6 +2418,7 @@ def plotlatlon(ds,
                diffPlev=None,
                diffTSteps=None,
                diffVar=None,
+               extend=None,
                fontSize=12,
                figDims=None,
                latLim=np.array([-30, 30]),
@@ -2383,7 +2487,8 @@ def plotlatlon(ds,
                  # (plev if np.ndim(ds[plotVar]) == 4
                  #  else '')
                  ),
-                diff_flag=any([diff_flag,
+                diff_flag=any([all([diff_flag,
+                                    not useDiffDs_flag]),
                                rmRegMean_flag])
                 )
 
@@ -2396,7 +2501,8 @@ def plotlatlon(ds,
     # Find colormap for means
     if cMap is None:
         cMap = mwp.getcmap(plotVar,
-                           diff_flag=any([diff_flag,
+                           diff_flag=any([all([diff_flag,
+                                               not useDiffDs_flag]),
                                           rmRegMean_flag])
                            )
 
@@ -2455,7 +2561,8 @@ def plotlatlon(ds,
                                             else ds),
                                            plotVar,
                                            tSteps,
-                                           diff_flag=diff_flag,
+                                           diff_flag=all([diff_flag,
+                                                          not useDiffDs_flag]),
                                            diffAsPct_flag=diffAsPct_flag,
                                            diffDs=diffDs,
                                            diffPlev=diffPlev,
@@ -2519,8 +2626,10 @@ def plotlatlon(ds,
                                 compcont=(compcont
                                           if compcont_flag
                                           else None),
-                                extend=['both', 'max'][plotVar in
-                                                       maxExtendVars],
+                                extend=(['both', 'max'][plotVar in
+                                                        maxExtendVars]
+                                        if extend is None else
+                                        extend),
                                 fill_color=[0.3, 0.3, 0.3],
                                 fontsize=10,  # fontSize,
                                 latlbls=latlbls,
@@ -2724,6 +2833,7 @@ def plotmultilatlon(dsDict,
                     lonLim=np.array([119.5, 270.5]),
                     lonlbls=None,
                     obsDs=None,
+                    obsVar=None,
                     plev=None,
                     quiver_flag=False,
                     quiverScale=0.4,
@@ -2735,6 +2845,7 @@ def plotmultilatlon(dsDict,
                     stampDate_flag=False,
                     subFigCountStart='a',
                     tSteps=None,
+                    useDiffDs_flag=False,
                     **kwargs
                     ):
     """
@@ -2769,11 +2880,12 @@ def plotmultilatlon(dsDict,
 
     # Set obs properties if needed
     if 'obs' in plotIdList:
-        obsVar = {'OMEGA': 'w',
-                  'PRECT': 'precip',
-                  'TAUX': 'iews',
-                  'TS': 'sst',
-                  }[plotVar]
+        if obsVar is None:
+            obsVar = {'OMEGA': 'w',
+                      'PRECT': ('precip' if 'precip' in obsDs else 'PRECT'),
+                      'TAUX': 'iews',
+                      'TS': 'sst',
+                      }[plotVar]
         # obsQuivDs = {'TAUX': eraiDs,
         #              'U': erai3dDs}[uVar]
         # obsUVar = {'TAUX': 'iews',
@@ -2963,14 +3075,38 @@ def plotmultilatlon(dsDict,
             cbColInd = 3
             cbRowInd = 0
             cbar_xoffset = -0.01
+    elif all([len(plotIdList) <= 12,
+              len(plotIdList) > 9]):
+        if cbarOrientation == 'vertical':
+            # Set figure window size
+            if np.diff(latLim) >= 50:
+                hf.set_size_inches(16.25, 6.75, forward=True)
+            else:
+                hf.set_size_inches(16.25, 7.75, forward=True)
 
+            # Set up subplots
+            gs = gridspec.GridSpec(4, 4,
+                                   height_ratios=[1, 1, 1, 1],
+                                   hspace=0.00,
+                                   width_ratios=[30, 30, 30, 1],
+                                   wspace=0.2,
+                                   left=0.04,
+                                   right=0.96,
+                                   bottom=0.00,
+                                   top=1.0,
+                                   )
+
+            # Set gridspec colorbar location
+            cbColInd = 3
+            cbRowInd = 0
+            cbar_xoffset = -0.01
         elif cbarOrientation == 'horizontal':
             # Set figure window size
             hf.set_size_inches(14, 12, forward=True)
 
             # Set up subplots
-            gs = gridspec.GridSpec(4, 3,
-                                   height_ratios=[20, 20, 20, 1],
+            gs = gridspec.GridSpec(5, 3,
+                                   height_ratios=[20, 20, 20, 20, 1],
                                    hspace=0.5,
                                    width_ratios=[1, 1, 1],
                                    wspace=0.5,
@@ -2978,11 +3114,11 @@ def plotmultilatlon(dsDict,
 
             # Set gridspec colorbar location
             cbColInd = 0
-            cbRowInd = 3
+            cbRowInd = 4
 
         # Set gridspec index order
-        colInds = [0, 1, 2, 0, 1, 2, 0, 1, 2]
-        rowInds = [0, 0, 0, 1, 1, 1, 2, 2, 2]
+        colInds = [0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2]
+        rowInds = [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3]
 
     # Set figure window title
     hf.canvas.set_window_title(('d' if diff_flag else '') +
@@ -2998,7 +3134,10 @@ def plotmultilatlon(dsDict,
             continue
         plt.subplot(gs[rowInds[jSet], colInds[jSet]])
         if diff_flag:
-            diffId = diffIdList[jSet]
+            if diffDs is None:
+                diffId = diffIdList[jSet]
+            else:
+                diffId = diffDs.id
             # print(plotId + ' - ' + diffId)
             im1, ax, compcont, _ = plotlatlon(
                 dsDict[plotId],
@@ -3030,6 +3169,7 @@ def plotmultilatlon(dsDict,
                 stampDate_flag=stampDate_flag,
                 tSteps=tSteps,
                 tStepLabel_flag=(jSet == 0),
+                useDiffDs_flag=useDiffDs_flag,
                 **kwargs
                 )
         else:
@@ -3060,6 +3200,7 @@ def plotmultilatlon(dsDict,
                     stampDate_flag=stampDate_flag,
                     tSteps=tSteps,
                     tStepLabel_flag=(jSet == 0),
+                    useDiffDs_flag=useDiffDs_flag,
                     **kwargs
                     )
             else:
@@ -3091,6 +3232,7 @@ def plotmultilatlon(dsDict,
                     stampDate_flag=stampDate_flag,
                     tSteps=tSteps,
                     tStepLabel_flag=(jSet == 0),
+                    useDiffDs_flag=useDiffDs_flag,
                     **kwargs
                     )
 
@@ -3153,10 +3295,15 @@ def plotmultilatlon(dsDict,
 
             # Label colorbar with variable name and units
             cbar_ax.set_ylabel(
-                (r'$\Delta$' if diff_flag else '') +
+                (r'$\Delta$'
+                 if all([diff_flag, not useDiffDs_flag]) else
+                 '') +
                 varName + ' (' +
-                mwfn.getstandardunitstring(
-                    dsDict[goodPlotId][plotVar].units) +
+                ('fraction'
+                 if diffAsPct_flag else
+                 mwfn.getstandardunitstring(
+                     dsDict[goodPlotId][plotVar].units)
+                 ) +
                 ')')
 
         elif cbarOrientation == 'horizontal':
@@ -4514,9 +4661,16 @@ def regriddatasets(dataSets,
                                else ncSubDir) +
                               '3dregrid/')
         elif gethostname()[0:6] in getncarmachlist():
-            threeDdir[vid] = (ncDir + fileBaseDict[vid] + '/' +
-                              ncSubDir +
-                              '3dregrid/')
+            try:
+                # Assume ncSubDir is same for all runs
+                threeDdir[vid] = (ncDir + fileBaseDict[vid] + '/' +
+                                  ncSubDir +
+                                  '3dregrid/')
+            except TypeError:
+                # Assume ncSubDir is a dict with entries for each run
+                threeDdir[vid] = (ncDir + fileBaseDict[vid] + '/' +
+                                  ncSubDir[vid] +
+                                  '3dregrid/')
 
         # Set filename for saving netcdf file of regridded output
         threeDfile[vid] = (fileBaseDict[vid] +
@@ -4649,9 +4803,16 @@ def regriddatasets(dataSets,
                                  '3dregrid/')
                 elif gethostname()[0:6] in getncarmachlist(6):
                     # Set directory for saving netcdf file of regridded output
-                    threeDdir = (ncDir + fileBaseDict[vid] + '/' +
-                                 ncSubDir +
-                                 '3dregrid/')
+                    try:
+                        # Assume ncSubDir is the same for all cases
+                        threeDdir = (ncDir + fileBaseDict[vid] + '/' +
+                                     ncSubDir +
+                                     '3dregrid/')
+                    except TypeError:
+                        # Assume ncSubDir is dict with entry for all cases
+                        threeDdir = (ncDir + fileBaseDict[vid] + '/' +
+                                     ncSubDir[vid] +
+                                     '3dregrid/')
                 # Set filename for saving netcdf file of regridded output
                 threeDfile = (fileBaseDict[vid] +
                               '.plevs.nc')

@@ -924,8 +924,9 @@ def loadmodelruns(versionIds,
                                          )
 
     # Open netcdf file(s)
-    for vid in versionIds:
-        print(loadFileLists[vid][0])
+    if verbose_flag:
+        for vid in versionIds:
+            print(loadFileLists[vid][0])
     dataSets = {versionId: xr.open_mfdataset(loadFileLists[versionId],
                                              decode_times=False)
                 for versionId in versionIds}
@@ -2824,6 +2825,7 @@ def plotmultilatlon(dsDict,
                     diffAsPct_flag=False,
                     diffIdList=None,
                     diffDs=None,
+                    diffDsDict=None,
                     diffPlev=None,
                     diffVar=None,
                     figSize=None,
@@ -2885,6 +2887,7 @@ def plotmultilatlon(dsDict,
                       'PRECT': ('precip' if 'precip' in obsDs else 'PRECT'),
                       'TAUX': 'iews',
                       'TS': 'sst',
+                      'SWCF': ('swcf' if 'swcf' in obsDs else 'SWCF'),
                       }[plotVar]
         # obsQuivDs = {'TAUX': eraiDs,
         #              'U': erai3dDs}[uVar]
@@ -3053,6 +3056,10 @@ def plotmultilatlon(dsDict,
             
     elif len(plotIdList) == 9:
         if cbarOrientation == 'vertical':
+            # Set number of rows and columns
+            nRows = 3
+            nCols = 4  # 3 for plots; 1 for colorbar
+            
             # Set figure window size
             if np.diff(latLim) >= 50:
                 hf.set_size_inches(16.25, 6.75, forward=True)
@@ -3060,7 +3067,7 @@ def plotmultilatlon(dsDict,
                 hf.set_size_inches(16.25, 5.75, forward=True)
 
             # Set up subplots
-            gs = gridspec.GridSpec(3, 4,
+            gs = gridspec.GridSpec(nRows, nCols,
                                    height_ratios=[1, 1, 1],
                                    hspace=0.00,
                                    width_ratios=[30, 30, 30, 1],
@@ -3072,9 +3079,14 @@ def plotmultilatlon(dsDict,
                                    )
 
             # Set gridspec colorbar location
-            cbColInd = 3
+            cbColInd = nCols - 1
             cbRowInd = 0
             cbar_xoffset = -0.01
+
+        # Set gridspec index order
+        colInds = [j for j in range(nCols - 1)]*nRows
+        rowInds = np.repeat([j for j in range(nRows)], nCols - 1)
+
     elif all([len(plotIdList) <= 12,
               len(plotIdList) > 9]):
         if cbarOrientation == 'vertical':
@@ -3136,8 +3148,14 @@ def plotmultilatlon(dsDict,
         if diff_flag:
             if diffDs is None:
                 diffId = diffIdList[jSet]
+                diffDs = (dsDict[diffIdList[jSet]]
+                          if diffDsDict is None
+                          else diffDsDict[diffIdList[jSet]])
             else:
-                diffId = diffDs.id
+                try:
+                    diffId = diffDs.id
+                except AttributeError:
+                    diffId = diffDs[diffIdList[0]].id
             # print(plotId + ' - ' + diffId)
             im1, ax, compcont, _ = plotlatlon(
                 dsDict[plotId],
@@ -3147,10 +3165,7 @@ def plotmultilatlon(dsDict,
                 compcont_flag=compcont_flag,
                 diff_flag=diff_flag,
                 diffAsPct_flag=diffAsPct_flag,
-                diffDs=(dsDict[diffIdList[jSet]]
-                        if any([diffDs is None,
-                                diffDs == dsDict])
-                        else diffDs),
+                diffDs=diffDs,
                 diffPlev=diffPlev,
                 diffVar=diffVar,
                 fontSize=fontSize,
@@ -3211,12 +3226,7 @@ def plotmultilatlon(dsDict,
                     cbar_flag=False,
                     compcont_flag=compcont_flag,
                     diff_flag=False,
-                    diffDs=(
-                        (dsDict[diffIdList[jSet]]
-                         if any([diffDs is None,
-                                diffDs == dsDict])
-                         else diffDs)
-                        if diff_flag else None),
+                    diffDs=None,
                     fontSize=fontSize,
                     latLim=latLim,
                     latlbls=latlbls,
@@ -3282,6 +3292,8 @@ def plotmultilatlon(dsDict,
             # Add level if original field is 4d
             varName = varName + str(plev)
         if all([diff_flag, plev != diffPlev]):
+            print(plev)
+            print(diffPlev)
             # Add differencing of levels if plotting differences and
             #   plev and diffPlev are not the same (for plotting shears)
             varName = varName + '-' + str(diffPlev)

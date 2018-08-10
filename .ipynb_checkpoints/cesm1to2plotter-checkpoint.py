@@ -510,16 +510,16 @@ def getloadsuffix(vid,
 
 
 def getmarkerdict():
-    return {'01': 'o',
-            '28': 'o',
-            '36': 'o',
+    return {'01': '^',
+            '28': '^',
+            '36': '^',
             'ga7.66': 'o',
             '100': 'o',
             '113': 'o',
             '114': 'o',
             '116': 'o',
             '118': 'o',
-            '119': 'o',
+            '119': '^',
             '119f': 's',
             '119f_gamma': '^',
             '119f_ice': '*',
@@ -2828,10 +2828,13 @@ def plotmultilatlon(dsDict,
                     diffDsDict=None,
                     diffPlev=None,
                     diffVar=None,
+                    dpi=300,
                     figSize=None,
                     fontSize=12,
                     latLim=np.array([-30, 30]),
                     latlbls=None,
+                    lineCont_flag=False,
+                    lineContVar=None,
                     lonLim=np.array([119.5, 270.5]),
                     lonlbls=None,
                     obsDs=None,
@@ -3009,18 +3012,16 @@ def plotmultilatlon(dsDict,
             gs.update(left=0.05, right=0.92, top=0.95, bottom=0.05)
 
             # Set gridpsec index order
-            colInds = [0, 0, 0, 1, 1, 1]
-            rowInds = [0, 1, 2, 0, 1, 2]
+            # colInds = [0, 0, 0, 1, 1, 1]
+            # rowInds = [0, 1, 2, 0, 1, 2]
+            colInds = [0, 1, 0, 1, 0, 1]
+            rowInds = [0, 0, 1, 1, 2, 2]
 
             # Set gridspec colorbar location
             cbColInd = 2
             cbRowInd = 0
             cbar_xoffset = -0.02
-    
-            # Set gridspec colorbar location
-            cbColInd = 3
-            cbRowInd = 0
-            cbar_xoffset = -0.01
+
     elif len(plotIdList) == 8:
         if cbarOrientation == 'vertical':
             # Set figure window size
@@ -3171,6 +3172,8 @@ def plotmultilatlon(dsDict,
                 fontSize=fontSize,
                 latLim=latLim,
                 latlbls=latlbls,
+                lineCont_flag=lineCont_flag,
+                lineContVar=lineContVar,
                 lonLim=lonLim,
                 lonlbls=lonlbls,
                 makeFigure_flag=False,
@@ -3188,7 +3191,6 @@ def plotmultilatlon(dsDict,
                 **kwargs
                 )
         else:
-            # print(plotId)
             if plotId == 'obs':
                 (a, ax, c, m) = plotlatlon(
                     obsDs,  # hadIsstDs
@@ -3200,6 +3202,8 @@ def plotmultilatlon(dsDict,
                     fontSize=fontSize,
                     latLim=latLim,  # np.array([-20, 20]),
                     latlbls=latlbls,
+                    lineCont_flag=lineCont_flag,
+                    lineContVar=lineContVar,
                     lonLim=lonLim,  # np.array([119.5, 270.5]),
                     lonlbls=lonlbls,
                     makeFigure_flag=False,
@@ -3230,6 +3234,8 @@ def plotmultilatlon(dsDict,
                     fontSize=fontSize,
                     latLim=latLim,
                     latlbls=latlbls,
+                    lineCont_flag=lineCont_flag,
+                    lineContVar=lineContVar,
                     lonLim=lonLim,
                     lonlbls=lonlbls,
                     makeFigure_flag=False,
@@ -3389,6 +3395,8 @@ def plotmultilatlon(dsDict,
                 # Add differencing of levels if plotting differences and
                 #   plev and diffPlev are not the same (for plotting shears)
                 varName = varName + '-' + str(diffPlev)
+            if diffAsPct_flag:
+                varName = varName + 'rel'
             saveFile = ('d' + varName +
                         '_latlon_comp{:d}_'.format(len(plotIdList)) +
                         diffStr +
@@ -3413,7 +3421,10 @@ def plotmultilatlon(dsDict,
                 '{:03.0f}'.format(tSteps[-1]) +
                 ('_nocb' if not cbar_flag else '')
                 )
-
+        
+        if lineCont_flag:
+            saveFile = saveFile + '_' + lineContVar + 'conts'
+        
         # Set saved figure size (inches)
         fx = hf.get_size_inches()[0]
         fy = hf.get_size_inches()[1]
@@ -3421,7 +3432,8 @@ def plotmultilatlon(dsDict,
         # Save figure
         print(saveDir + saveFile)
         mwp.savefig(saveDir + saveFile,
-                    shape=np.array([fx, fy]))
+                    shape=np.array([fx, fy]),
+                    dpi=dpi)
         plt.close('all')
 
 
@@ -4919,6 +4931,6 @@ def setfilepaths(loadClimo_flag=True,
         else:
             ncDir = '/glade/p/cgd/amp/people/hannay/amwg/climo/'
             ncSubDir = '0.9x1.25/'
-        saveDir = '/glade/work/woelfle/figs/cesm1to2/'
+        saveDir = '/gpfs/fs1/work/woelfle/figs/cesm1to2/'
 
     return (ncDir, ncSubDir, saveDir)

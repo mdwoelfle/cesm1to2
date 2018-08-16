@@ -590,6 +590,7 @@ def getmapcontlevels(plotVar,
                       'PSL': np.arange(-4, 4.01, 0.5),
                       'RELHUM': np.arange(-10, 10.1, 1),
                       'SHFLX': np.arange(-10, 10.1, 1.),
+                      'SST': np.arange(-2, 2.1, 0.2),
                       'SWCF': np.arange(-50, 50.1, 5),
                       'T': np.arange(-2, 2.1, 0.2),
                       'TAUX': np.arange(-0.1, 0.101, 0.01),
@@ -2000,10 +2001,15 @@ def plotprecipcentroidvlon(dsList,
                            diff_flag=True,
                            makeFigure_flag=True,
                            refDs=None,
+                           refString=None,
                            refVar=None,
                            saveDir=None,
                            save_flag=False,
+                           seasCyc_flag=False,
+                           subFigCountStart='a',
+                           verbose_flag=False,
                            yLim=None,
+                           yTicks=None,
                            ):
     """
     Create plot of precipitation centroid at each longitude
@@ -2012,21 +2018,51 @@ def plotprecipcentroidvlon(dsList,
     # Create figure if needed
     if makeFigure_flag:
         hf = plt.figure()
-        hf.set_size_inches(10, 3*len(dsList) + 1, forward=True)
     else:
         hf = plt.gcf()
 
-    # Create suplot axes
-    gs = gridspec.GridSpec(len(dsList), 2,
-                           width_ratios=[10, 1],
-                           wspace=0,
-                           )
+    # Create subplot grid for plotting
+    if len(dsList) == 10:
+        nCol = 2
+        
+        hf.set_size_inches(15, 9, forward=True)
+        
+        hspace = 0.3
+        
+        gs1 = gridspec.GridSpec(5, 2,
+                                left=0.05,
+                                right=0.48,
+                                width_ratios=[10, 1],
+                                wspace=0,
+                                hspace=hspace)
+
+        gs2 = gridspec.GridSpec(5, 2,
+                                left=0.52,
+                                right=0.95,
+                                width_ratios=[10, 1],
+                                wspace=0,
+                                hspace=hspace)
+        
+
+    else:
+        nCol = 1
+        
+        hf.set_size_inches(10, 3*len(dsList) + 1, forward=True)
+
+        # Create suplot axes
+        gs = gridspec.GridSpec(len(dsList), 2,
+                               width_ratios=[10, 1],
+                               wspace=0,
+                               )
+
 
     # Ensure varList is a list
     # if isinstance(varList, str):
     #     varList = [varList]*len(dsList)
 
     for (jDs, ds) in enumerate(dsList):
+        if verbose_flag:
+            print('Processing {:s}'.format(ds.id))
         # Compute centroid as fn(longitude) data arrays
         try:
             centDa = mwfn.calcdslonprecipcentroid(ds,
@@ -2042,6 +2078,22 @@ def plotprecipcentroidvlon(dsList,
                                                   )
 
         centVals = centDa.values.copy()
+        
+        # Compute centroid over entire tropics
+        try:
+            glblCentDa = mwfn.calcdsprecipcentroid(ds,
+                                                  indexType='areaweight',
+                                                  precipVar=varList[jDs],
+                                                  qc_flag=False,
+                                                  )
+        except KeyError:
+            glblCentDa = mwfn.calcdsprecipcentroid(ds,
+                                                  indexType='areaweight',
+                                                  precipVar=varList,
+                                                  qc_flag=False,
+                                                  )
+        
+        glblCentVals = glblCentDa.values.copy()
 
         if diff_flag:
             try:
@@ -2053,7 +2105,17 @@ def plotprecipcentroidvlon(dsList,
                     )
                 refCentVals = refCentDa.values.copy()
             except NameError:
-                raise NameError('Must provide refDS and refVar to difference')
+                raise NameError('Must provide refDs and refVar to difference')
+            try:
+                refGlblCentDa = mwfn.calcdsprecipcentroid(
+                    refDs,
+                    indexType='areaweight',
+                    precipVar=refVar,
+                    qc_flag=False,
+                    )
+                refGlblCentVals = refGlblCentDa.values.copy()
+            except NameError:
+                raise NameError('Must provide refDs and refVar to difference')
 
         # Subset centVals if needed to match spacing for differencing
         #   ONLY WORKS WITH GPCP <--> CESM 1 DEGREE!!
@@ -2074,68 +2136,124 @@ def plotprecipcentroidvlon(dsList,
             lon = ds.lon
 
         # Plot lon vs dlat plot of centroids for each month
-        plt.subplot(gs[jDs, 0])
-        for mon in range(12):
-            colorVal = scalarMap.to_rgba(colorIdx[mon])
-            plt.plot(lon.values,
-                     centVals[mon, :] -
-                     (refCentVals[mon, :] if diff_flag else 0),
-                     color=colorVal,
-                     label=calendar.month_abbr[colorIdx[mon] + 1],
-                     )
+        try:
+            plt.subplot(gs[jDs, 0])
+        except NameError:
+            if jDs < len(dsList)/2:
+                plt.subplot(gs1[jDs, 0])
+            else:
+                plt.subplot(gs2[int(jDs-len(dsList)/2), 0])
 
-        # Plot lon vs dlat plot of centroids for annual mean
-        plt.plot(lon.values,
-                 centVals.mean(axis=0) -
-                 (refCentVals.mean(axis=0) if diff_flag else 0),
-                 '--k',
-                 label='Ann. Mean')
+        if seasCyc_flag:
+            for mon in range(12):
+                colorVal = scalarMap.to_rgba(colorIdx[mon])
+                plt.plot(lon.values,
+                         centVals[mon, :] -
+                         (refCentVals[mon, :] if diff_flag else 0),
+                         color=colorVal,
+                         label=calendar.month_abbr[colorIdx[mon] + 1],
+                         )
+
+            # Plot lon vs dlat plot of centroids for annual mean
+            plt.plot(lon.values,
+                     centVals.mean(axis=0) -
+                     (refCentVals.mean(axis=0) if diff_flag else 0),
+                     '--k',
+                     label='Ann. Mean')
+        else:
+            # Plot lon vs dlat plot of centroids for annual mean
+            plt.plot(lon.values,
+                     centVals.mean(axis=0) -
+                     (refCentVals.mean(axis=0) if diff_flag else 0),
+                     color=getcolordict()[ds.id],
+                     label='Ann. Mean',
+                    lw=4)
+            ax = plt.gca()
+            ax.fill_between(lon.values,
+                            (centVals.mean(axis=0) -
+                             (refCentVals.mean(axis=0) if diff_flag else 0)),
+                            np.zeros_like(lon.values),
+                            facecolor=[0.7, 0.7, 0.7],
+                            interpolate=True)
 
         # Dress plot
         plt.xlim([0, 360])
-        plt.xlabel('Longitude')
+        if any([jDs + 1 == len(dsList), 
+                jDs + 1 == len(dsList)/2]):
+            plt.xlabel('Longitude (deg. E)')
         plt.xticks(np.arange(0, 361, 30))
-        plt.ylabel(ds.id +
-                   (('-' + refDs.id) if diff_flag else '') +
-                   ' (deg. latitude)')
+        if any([nCol == 1, jDs < len(dsList)/2]):
+            plt.ylabel(('$\Delta$' if diff_flag else '') +
+                       'Centroid (deg.)')
         if yLim is None:
             yLim = plt.ylim()
             yLim = [-np.max(np.abs(yLim)), np.max(np.abs(yLim))]
         plt.ylim(yLim)
-        plt.title(('Bias in p' if diff_flag else 'P') +
-                  'recipitation centroid as function of longitude\n' +
-                  '(' + ds.id +
-                  (('-' + refDs.id) if diff_flag else '') +
-                  ')')
+        
+        if yTicks is None:
+            print('things')
+            yTicks = plt.yticks()[0]
+        plt.yticks(yTicks)
+        
+        if any([jDs == 0, all([jDs == len(dsList)/2, nCol == 2])]):
+            plt.title(('Bias in p' if diff_flag else 'P') +
+                      'recipitation centroid as function of longitude')
         plt.grid()
-
-        # Get yticks for second subplot
-        yTicks = plt.yticks()
+        
+        plt.annotate('(' +chr(jDs +
+                              ord(subFigCountStart)
+                              ) +
+                     ') ' +
+                     ds.id +
+                     (('-' + (refString if refString is not None else refDs.id))
+                       if diff_flag else ''),
+                     xy=(0.015, 0.92),
+                     xycoords='axes fraction',
+                     horizontalalignment='left',
+                     verticalalignment='top',
+                     backgroundcolor=[1, 1, 1],
+                     )
 
         # Add legend to last row only
-        if jDs == (len(dsList) - 1):
-            plt.legend(ncol=7, loc=4)
+        if seasCyc_flag:
+            if jDs == (len(dsList) - 1):
+                plt.legend(ncol=7, loc=4)
 
         # Plot zonal mean reference lines of dlat for centroids
-        ax2 = plt.subplot(gs[jDs, 1])
+        try:
+            ax2 = plt.subplot(gs[jDs, 1])
+        except NameError:
+            if jDs < len(dsList)/2:
+                ax2 = plt.subplot(gs1[jDs, 1])
+            else:
+                ax2 = plt.subplot(gs2[int(jDs-len(dsList)/2), 1])
+        # ax2 = plt.subplot(gs[jDs, 1])
 
-        for mon in range(12):
-            colorVal = scalarMap.to_rgba(colorIdx[mon])
+        if seasCyc_flag:
+            for mon in range(12):
+                colorVal = scalarMap.to_rgba(colorIdx[mon])
 
+                plt.plot([0, 1],
+                         [glblCentVals[mon] -  # *2 to plot line
+                          (refGlblCentVals[mon] if diff_flag else 0)]*2,
+                         color=colorVal,
+                         label=None,
+                         )
             plt.plot([0, 1],
-                     [centVals[mon, :].mean() -  # *2 to plot line
-                      (refCentVals[mon, :].mean() if diff_flag else 0)]*2,
-                     color=colorVal,
-                     label=None,
-                     )
-        plt.plot([0, 1],
-                 [centVals.mean(axis=0).mean() -
-                  (refCentVals.mean(axis=0).mean() if diff_flag else 0)]*2,
-                 '--k',
-                 label=None)
+                     [glblCentVals.mean() -
+                      (refGlblCentVals.mean() if diff_flag else 0)]*2,
+                     '--k',
+                     label=None)
+        else:
+            plt.plot([0, 1],
+                     [glblCentVals.mean() -
+                      (refGlblCentVals.mean() if diff_flag else 0)]*2,
+                     color=getcolordict()[ds.id],
+                     lw=4,
+                     label=None)
         plt.xlim([-1, 2])
         plt.xticks([])
-        plt.yticks(yTicks[0])
+        plt.yticks(yTicks)
 
         plt.ylim(yLim)
         ax2.yaxis.set_ticklabels([])
@@ -2143,10 +2261,11 @@ def plotprecipcentroidvlon(dsList,
         plt.grid()
         for tic in ax2.yaxis.get_major_ticks():
             tic.tick1On = tic.tick2On = False
-        plt.title('Zonal\nMean')
+        if any([jDs == 0, all([jDs == len(dsList)/2, nCol == 2])]):
+            plt.title('Zonal\nMean')
 
     # Force everything to fit on the plot
-    plt.tight_layout()
+    # plt.tight_layout()
 
     # Save figure if requested
     if save_flag:
@@ -2164,6 +2283,9 @@ def plotprecipcentroidvlon(dsList,
                         '_minus' + refDs.id
                         )
 
+        if seasCyc_flag:
+            saveFile = saveFile + '_seasCyc'
+            
         # Set saved figure size (inches)
         fx = hf.get_size_inches()[0]
         fy = hf.get_size_inches()[1]
@@ -2200,10 +2322,10 @@ def getlatlonpdata(ds,
                    rmRegLonLim=None,
                    uVar=None,
                    vVar=None,
+                   verbose_flag=False,
                    ):
     """
     Get array for plotitng a map
-    ** Started, but not implemented **
     """
     
     if diffPlev is None:
@@ -2261,6 +2383,16 @@ def getlatlonpdata(ds,
             pData = ds[plotVar].values[tSteps, jPlev, :, :].mean(axis=0)
 
     # Filter to only values over ocean
+    if ocnOnly_flag:
+        try:
+            # Create ocean filter as True wherever the is no land
+            landFracDa = ds['LANDFRAC']
+            ocnFilt = (landFracDa.values[0, :, :] == 0)
+
+            # Set values in ds to nan wherever there is some land
+            pData[~ocnFilt] = np.nan
+        except KeyError:
+            pass
 
     # Pull data for plotting vectors (if needed)
     if quiver_flag:
@@ -2355,6 +2487,7 @@ def getlatlonpdata(ds,
                                        qc_flag=qc_flag,
                                        stdUnits_flag=False,
                                        )
+
         # print(regMeanDs.values)
         # Compute time mean regional mean to be subtracted
         regMean = regMeanDs.values[tSteps].mean(axis=0)
@@ -2557,33 +2690,64 @@ def plotlatlon(ds,
             pass
 
     # Pull data for plotting color contours
-    (pData, uData, vData) = getlatlonpdata((diffDs
-                                            if useDiffDs_flag
-                                            else ds),
-                                           plotVar,
-                                           tSteps,
-                                           diff_flag=all([diff_flag,
-                                                          not useDiffDs_flag]),
-                                           diffAsPct_flag=diffAsPct_flag,
-                                           diffDs=diffDs,
-                                           diffPlev=diffPlev,
-                                           diffTSteps=diffTSteps,
-                                           diffVar=diffVar,
-                                           ocnOnly_flag=ocnOnly_flag,
-                                           plev=plev,
-                                           qc_flag=qc_flag,
-                                           quiver_flag=quiver_flag,
-                                           quiverDs=quiverDs,
-                                           quiverDiffDs=quiverDiffDs,
-                                           quiverNorm_flag=quiverNorm_flag,
-                                           quiverScaleVar=quiverScaleVar,
-                                           rmRegMean_flag=rmRegMean_flag,
-                                           rmRegLatLim=rmRegLatLim,
-                                           rmRegLonLim=rmRegLonLim,
-                                           uVar=uVar,
-                                           vVar=vVar,
-                                           )
-    
+    try:
+        (pData, uData, vData) = getlatlonpdata((diffDs
+                                                if useDiffDs_flag
+                                                else ds),
+                                               plotVar,
+                                               tSteps,
+                                               diff_flag=all([diff_flag,
+                                                              not useDiffDs_flag]),
+                                               diffAsPct_flag=diffAsPct_flag,
+                                               diffDs=diffDs,
+                                               diffPlev=diffPlev,
+                                               diffTSteps=diffTSteps,
+                                               diffVar=diffVar,
+                                               ocnOnly_flag=ocnOnly_flag,
+                                               plev=plev,
+                                               qc_flag=qc_flag,
+                                               quiver_flag=quiver_flag,
+                                               quiverDs=quiverDs,
+                                               quiverDiffDs=quiverDiffDs,
+                                               quiverNorm_flag=quiverNorm_flag,
+                                               quiverScaleVar=quiverScaleVar,
+                                               rmRegMean_flag=rmRegMean_flag,
+                                               rmRegLatLim=rmRegLatLim,
+                                               rmRegLonLim=rmRegLonLim,
+                                               uVar=uVar,
+                                               vVar=vVar,
+                                               )
+    except AttributeError as AE:
+        if ocnOnly_flag:
+            print('Cannot do ocean only for {:s}; attempting without this flag.'.format(ds.id))
+            (pData, uData, vData) = getlatlonpdata((diffDs
+                                                    if useDiffDs_flag
+                                                    else ds),
+                                                   plotVar,
+                                                   tSteps,
+                                                   diff_flag=all([diff_flag,
+                                                                  not useDiffDs_flag]),
+                                                   diffAsPct_flag=diffAsPct_flag,
+                                                   diffDs=diffDs,
+                                                   diffPlev=diffPlev,
+                                                   diffTSteps=diffTSteps,
+                                                   diffVar=diffVar,
+                                                   ocnOnly_flag=False,
+                                                   plev=plev,
+                                                   qc_flag=qc_flag,
+                                                   quiver_flag=quiver_flag,
+                                                   quiverDs=quiverDs,
+                                                   quiverDiffDs=quiverDiffDs,
+                                                   quiverNorm_flag=quiverNorm_flag,
+                                                   quiverScaleVar=quiverScaleVar,
+                                                   rmRegMean_flag=rmRegMean_flag,
+                                                   rmRegLatLim=rmRegLatLim,
+                                                   rmRegLonLim=rmRegLonLim,
+                                                   uVar=uVar,
+                                                   vVar=vVar,
+                                                   )
+        else:
+            raise AttributeError(AE)
     # Set variables to only extend one end of colorbar
     maxExtendVars = ['PRECT', 'PRECC', 'PRECL', 'precip', 'U10']
 
@@ -2724,7 +2888,7 @@ def plotlatlon(ds,
         plt.clabel(CS, fontsize=9, inline=1)
         
     # Add removed regional mean to annotations
-    if rmRegMean_flag:
+    if False:  # rmRegMean_flag:
         if diff_flag:
             rmMeanString = (
                 '\nRm Reg Mean = {:0.1f} {:s}'.format(regMean - dregMean,
@@ -2889,7 +3053,7 @@ def plotmultilatlon(dsDict,
             obsVar = {'OMEGA': 'w',
                       'PRECT': ('precip' if 'precip' in obsDs else 'PRECT'),
                       'TAUX': 'iews',
-                      'TS': 'sst',
+                      'TS': ('sst' if 'sst' in obsDs else 'SST'),
                       'SWCF': ('swcf' if 'swcf' in obsDs else 'SWCF'),
                       }[plotVar]
         # obsQuivDs = {'TAUX': eraiDs,
@@ -2997,30 +3161,77 @@ def plotmultilatlon(dsDict,
             # Set gridspec colorbar location
             cbColInd = 2
             cbRowInd = 0
+    elif len(plotIdList) == 5:
+        if np.abs(lonLim[0] - lonLim[1]) > 180:
+            if cbarOrientation == 'vertical':
+                # Set figure window size
+                hf.set_size_inches(6.5, 7, forward=True)
 
+                # Set up subplots
+                gs = gridspec.GridSpec(len(plotIdList), 2,
+                                       # height_ratios=[20, 1, 20, 1, 20],
+                                       hspace=0.1,
+                                       width_ratios=[30, 1],
+                                       )
+                gs.update(left=0.05, right=0.92, top=0.95, bottom=0.05)
+
+                # Set gridpsec index order
+                # colInds = [0, 0, 0, 1, 1, 1]
+                # rowInds = [0, 1, 2, 0, 1, 2]
+                colInds = [0]*len(plotIdList)
+                rowInds = np.arange(len(plotIdList))
+
+                # Set gridspec colorbar location
+                cbColInd = 1
+                cbRowInd = 0
+                cbar_xoffset = -0.02
     elif len(plotIdList) == 6:
-        if cbarOrientation == 'vertical':
-            # Set figure window size
-            hf.set_size_inches(10, 6, forward=True)
+        if np.abs(lonLim[0] - lonLim[1]) > 180:
+            if cbarOrientation == 'vertical':
+                # Set figure window size
+                hf.set_size_inches(6.5, 9, forward=True)
 
-            # Set up subplots
-            gs = gridspec.GridSpec(3, 3,
-                                   # height_ratios=[20, 1, 20, 1, 20],
-                                   hspace=0.3,
-                                   width_ratios=[30, 30, 1],
-                                   )
-            gs.update(left=0.05, right=0.92, top=0.95, bottom=0.05)
+                # Set up subplots
+                gs = gridspec.GridSpec(len(plotIdList), 2,
+                                       # height_ratios=[20, 1, 20, 1, 20],
+                                       hspace=0.1,
+                                       width_ratios=[30, 1],
+                                       )
+                gs.update(left=0.05, right=0.92, top=0.95, bottom=0.05)
 
-            # Set gridpsec index order
-            # colInds = [0, 0, 0, 1, 1, 1]
-            # rowInds = [0, 1, 2, 0, 1, 2]
-            colInds = [0, 1, 0, 1, 0, 1]
-            rowInds = [0, 0, 1, 1, 2, 2]
+                # Set gridpsec index order
+                # colInds = [0, 0, 0, 1, 1, 1]
+                # rowInds = [0, 1, 2, 0, 1, 2]
+                colInds = [0]*len(plotIdList)
+                rowInds = np.arange(len(plotIdList))
 
-            # Set gridspec colorbar location
-            cbColInd = 2
-            cbRowInd = 0
-            cbar_xoffset = -0.02
+                # Set gridspec colorbar location
+                cbColInd = 1
+                cbRowInd = 0
+                cbar_xoffset = -0.02
+        else:
+            if cbarOrientation == 'vertical':
+                # Set figure window size
+                hf.set_size_inches(10, 6, forward=True)
+
+                # Set up subplots
+                gs = gridspec.GridSpec(3, 3,
+                                       # height_ratios=[20, 1, 20, 1, 20],
+                                       hspace=0.3,
+                                       width_ratios=[30, 30, 1],
+                                       )
+                gs.update(left=0.05, right=0.92, top=0.95, bottom=0.05)
+
+                # Set gridpsec index order
+                # colInds = [0, 0, 0, 1, 1, 1]
+                # rowInds = [0, 1, 2, 0, 1, 2]
+                colInds = [0, 1, 0, 1, 0, 1]
+                rowInds = [0, 0, 1, 1, 2, 2]
+
+                # Set gridspec colorbar location
+                cbColInd = 2
+                cbRowInd = 0
+                cbar_xoffset = -0.02
 
     elif len(plotIdList) == 8:
         if cbarOrientation == 'vertical':
@@ -3091,6 +3302,7 @@ def plotmultilatlon(dsDict,
     elif all([len(plotIdList) <= 12,
               len(plotIdList) > 9]):
         if cbarOrientation == 'vertical':
+            print('here')
             # Set figure window size
             if np.diff(latLim) >= 50:
                 hf.set_size_inches(16.25, 6.75, forward=True)
@@ -3113,25 +3325,52 @@ def plotmultilatlon(dsDict,
             cbColInd = 3
             cbRowInd = 0
             cbar_xoffset = -0.01
+                
         elif cbarOrientation == 'horizontal':
-            # Set figure window size
-            hf.set_size_inches(14, 12, forward=True)
+            if False:
+                # Set figure window size
+                hf.set_size_inches(14, 12, forward=True)
 
-            # Set up subplots
-            gs = gridspec.GridSpec(5, 3,
-                                   height_ratios=[20, 20, 20, 20, 1],
-                                   hspace=0.5,
-                                   width_ratios=[1, 1, 1],
-                                   wspace=0.5,
-                                   )
+                # Set up subplots
+                gs = gridspec.GridSpec(5, 3,
+                                       height_ratios=[20, 20, 20, 20, 1],
+                                       hspace=0.5,
+                                       width_ratios=[1, 1, 1],
+                                       wspace=0.5,
+                                       )
 
-            # Set gridspec colorbar location
-            cbColInd = 0
-            cbRowInd = 4
+                # Set gridspec colorbar location
+                cbColInd = 0
+                cbRowInd = 4
+            else:
+                # Set figure window size
+                if np.diff(latLim) >= 50:
+                    hf.set_size_inches(10.25, 9.75, forward=True)
+                else:
+                    hf.set_size_inches(16.25, 7.75, forward=True)
 
+                # Set up subplots
+                gs = gridspec.GridSpec(6, 2,
+                                       # height_ratios=[1, 1, 1, 1],
+                                       hspace=0.3,
+                                       # width_ratios=[30, 30, 30, 1],
+                                       wspace=0.1,
+                                       left=0.04,
+                                       right=0.96,
+                                       bottom=0.00,
+                                       top=1.0,
+                                       )
+
+                # Set gridspec colorbar location
+                cbColInd = 1
+                cbRowInd = 5
+                cbar_yoffset = -0.065
+                
         # Set gridspec index order
-        colInds = [0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2]
-        rowInds = [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3]
+        # colInds = [0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2]
+        # rowInds = [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3]
+        colInds = [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1]
+        rowInds = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5]
 
     # Set figure window title
     hf.canvas.set_window_title(('d' if diff_flag else '') +
@@ -3326,7 +3565,7 @@ def plotmultilatlon(dsDict,
 
         elif cbarOrientation == 'horizontal':
             # Place colorbar on figure
-            cbar_ax.set_position([pcb.x0, pcb.y0 - 0.015,
+            cbar_ax.set_position([pcb.x0, pcb.y0 - cbar_yoffset,
                                   pcb.width*1., 0.015])
 
             # Label colorbar with variable name and units

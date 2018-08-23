@@ -3294,10 +3294,37 @@ def plotmultilatlon(dsDict,
             cbColInd = nCols - 1
             cbRowInd = 0
             cbar_xoffset = -0.01
+        elif cbarOrientation == 'horizontal':
+            # Set number of rows and columns
+            nRows = 5
+            nCols = 2  # 3 for plots; 1 for colorbar
+            
+            # Set figure window size
+            if np.diff(latLim) >= 50:
+                hf.set_size_inches(10, 8.5, forward=True)
+            else:
+                hf.set_size_inches(16.25, 5.75, forward=True)
 
+            # Set up subplots
+            gs = gridspec.GridSpec(nRows, nCols,
+                                   # height_ratios=[1, 1, 1],
+                                   hspace=0.3,
+                                   # width_ratios=[30, 30, 30, 1],
+                                   wspace=0.1,
+                                   left=0.04,
+                                   right=0.96,
+                                   bottom=0.00,
+                                   top=1.0,
+                                   )
+
+            # Set gridspec colorbar location
+            cbColInd = nCols - 1
+            cbRowInd = nRows - 1
+            cbar_yoffset = -0.065
+            
         # Set gridspec index order
-        colInds = [j for j in range(nCols - 1)]*nRows
-        rowInds = np.repeat([j for j in range(nRows)], nCols - 1)
+        colInds = [j for j in range(nCols)]*nRows
+        rowInds = np.repeat([j for j in range(nRows)], nCols)
 
     elif all([len(plotIdList) <= 12,
               len(plotIdList) > 9]):
@@ -3325,6 +3352,9 @@ def plotmultilatlon(dsDict,
             cbColInd = 3
             cbRowInd = 0
             cbar_xoffset = -0.01
+        
+            colInds = [0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2]
+            rowInds = [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3]
                 
         elif cbarOrientation == 'horizontal':
             if False:
@@ -3365,12 +3395,10 @@ def plotmultilatlon(dsDict,
                 cbColInd = 1
                 cbRowInd = 5
                 cbar_yoffset = -0.065
-                
-        # Set gridspec index order
-        # colInds = [0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2]
-        # rowInds = [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3]
-        colInds = [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1]
-        rowInds = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5]
+
+            # Set gridspec index order
+            colInds = [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1]
+            rowInds = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5]
 
     # Set figure window title
     hf.canvas.set_window_title(('d' if diff_flag else '') +

@@ -3233,6 +3233,72 @@ def plotmultilatlon(dsDict,
                 cbRowInd = 0
                 cbar_xoffset = -0.02
 
+    elif len(plotIdList) == 7:
+        if cbarOrientation == 'vertical':
+            # Set figure window size
+            if figSize is None:
+                if np.diff(latLim) >= 50:
+                    hf.set_size_inches(10, 6.5, forward=True)
+                else:
+                    hf.set_size_inches(10, 6.5, forward=True)
+            else:
+                hf.set_size_inches(figSize[0], figSize[1],
+                                   forward=True)
+
+            # Set up subplots
+            gs = gridspec.GridSpec(4, 3,
+                                   height_ratios=[1, 1, 1, 1],
+                                   hspace=0.05,
+                                   width_ratios=[30, 30, 1],
+                                   wspace=0.2,
+                                   left=0.04,
+                                   right=0.96,
+                                   bottom=0.00,
+                                   top=1.0,
+                                   )
+
+            # Set gridspec colorbar location
+            cbColInd = 2
+            cbRowInd = 0
+            cbar_xoffset = -0.01
+
+            # Set gridspec index order
+            colInds = [0, 1, 0, 1, 0, 1, 0]
+            rowInds = [0, 0, 1, 1, 2, 2, 3]
+        
+        elif cbarOrientation == 'horizontal':
+            
+            # Set grid arrangement
+            nCols = 2
+            nRows = 4
+            
+            # Set figure window size
+            if figSize is None:
+                hf.set_size_inches(10, 6, forward=True)
+            else:
+                hf.set_size_inches(figSize[0], figSize[1],
+                                  forward=True)
+            # Set up subplots
+            gs = gridspec.GridSpec(nRows, nCols,
+                                  height_ratios=[1]*nRows,
+                                  hspace=0.05,
+                                  width_ratios=[1]*nCols,
+                                  wspace=0.2,
+                                  left=0.04,
+                                  right=0.96,
+                                  bottom= 0.00,
+                                  top=1.0,
+                                  )
+            
+            # Set gridspec colorbar location
+            cbColInd = 1
+            cbRowInd = 3
+            cbar_yoffset = -0.15
+            
+            # Set gridspec index order
+            colInds = [j for j in range(nCols)]*nRows
+            rowInds = np.repeat([j for j in range(nRows)], nCols)
+
     elif len(plotIdList) == 8:
         if cbarOrientation == 'vertical':
             # Set figure window size
@@ -3261,7 +3327,37 @@ def plotmultilatlon(dsDict,
             cbColInd = 2
             cbRowInd = 0
             cbar_xoffset = -0.01
+
+        if cbarOrientation == 'horizontal':
             
+            # Set grid arrangement
+            nRows = 5
+            nCols = 2
+            
+            # Set figure window size
+            if figSize is None:
+                figSize = [11, 6]
+            hf.set_size_inches(figSize[0], figSize[1],
+                               forward=True)
+            
+            # Set up subplots
+            gs = gridspec.GridSpec(nRows, nCols,
+                                   height_ratios=[3, 3, 3, 3, 1],
+                                   hspace=0.5,
+                                   width_ratios=[1, 1],
+                                   wspace=0.0,  # 08,
+                                   left=0.04,
+                                   right=0.96,
+                                   bottom=0.00,
+                                   top=1.0,
+                                   )
+
+            # Set gridspec colorbar location
+            cbColInd = 0
+            cbRowInd = nRows - 1
+            cbar_yoffset = -0.05
+            cbar_width_ratio = 0.5
+
         # Set gridspec index order
         colInds = [0, 1, 0, 1, 0, 1, 0, 1]
         rowInds = [0, 0, 1, 1, 2, 2, 3, 3]
@@ -3280,7 +3376,7 @@ def plotmultilatlon(dsDict,
 
             # Set up subplots
             gs = gridspec.GridSpec(nRows, nCols,
-                                   height_ratios=[1, 1, 1],
+                                   height_ratios=[1]*nRows,
                                    hspace=0.00,
                                    width_ratios=[30, 30, 30, 1],
                                    wspace=0.2,
@@ -3560,6 +3656,7 @@ def plotmultilatlon(dsDict,
 
         # Get variable name for colorbar
         varName = mwp.getplotvarstring(dsDict[goodPlotId][plotVar].name)
+        
         # Get variable name for colorbar label
         if np.ndim(dsDict[goodPlotId][plotVar]) == 4:
             # Add level if original field is 4d
@@ -3592,13 +3689,22 @@ def plotmultilatlon(dsDict,
                 ')')
 
         elif cbarOrientation == 'horizontal':
+            
             # Place colorbar on figure
-            cbar_ax.set_position([pcb.x0, pcb.y0 - cbar_yoffset,
-                                  pcb.width*1., 0.015])
+            try:
+                cbar_ax.set_position([pcb.x0 + cbar_width_ratio/2 * pcb.width,
+                                      pcb.y0 - cbar_yoffset,
+                                      pcb.width * cbar_width_ratio,
+                                      0.015])
+            except NameError:
+                cbar_ax.set_position([pcb.x0, pcb.y0 - cbar_yoffset,
+                                      pcb.width*1., 0.015])
 
             # Label colorbar with variable name and units
             cbar_ax.set_xlabel(
-                (r'$\Delta$' if diff_flag else '') +
+                (r'$\Delta$'
+                 if all([diff_flag, not useDiffDs_flag]) else
+                 '') +
                 varName + ' (' +
                 mwfn.getstandardunitstring(
                     dsDict[goodPlotId][plotVar].units) +
